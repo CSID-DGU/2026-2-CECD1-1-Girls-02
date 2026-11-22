@@ -14,6 +14,7 @@ from .company_sources import (
     prepare_markdown_sections,
 )
 from .voc import PreparedVocCase, prepare_voc_rows
+from .review import ReviewDecision, apply_review_decisions, parse_review_decisions
 
 __all__ = [
     "NormalizedRecord",
@@ -27,4 +28,7 @@ __all__ = [
     "prepare_markdown_sections",
     "PreparedVocCase",
     "prepare_voc_rows",
+    "ReviewDecision",
+    "apply_review_decisions",
+    "parse_review_decisions",
 ]
