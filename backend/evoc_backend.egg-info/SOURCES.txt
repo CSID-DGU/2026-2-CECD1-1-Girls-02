@@ -1,0 +1,12 @@
+pyproject.toml
+app/__init__.py
+app/main.py
+app/api/__init__.py
+app/api/health.py
+app/core/__init__.py
+app/core/config.py
+evoc_backend.egg-info/PKG-INFO
+evoc_backend.egg-info/SOURCES.txt
+evoc_backend.egg-info/dependency_links.txt
+evoc_backend.egg-info/requires.txt
+evoc_backend.egg-info/top_level.txt
