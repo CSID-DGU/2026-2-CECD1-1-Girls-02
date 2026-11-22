@@ -22,6 +22,7 @@ from app.rag.pipeline.company_sources import (
     policy_profile,
 )
 from app.rag.pipeline.normalization import NormalizationError, write_jsonl
+from app.rag.pipeline.voc import prepare_voc_rows
 
 
 def _load_company_faq(path: Path) -> list[dict[str, object]]:
@@ -39,7 +40,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description="Prepare private source files for review; does not embed or index documents."
     )
-    parser.add_argument("--source", required=True, choices=("company-faq", "policy", "guide", "franchise"))
+    parser.add_argument("--source", required=True, choices=("company-faq", "policy", "guide", "franchise", "voc"))
     parser.add_argument("--input", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path, help="Safe ingestion JSONL output")
     parser.add_argument("--manifest", required=True, type=Path, help="Review and policy metadata JSONL")
@@ -50,6 +51,14 @@ def main() -> int:
 
     if args.source == "company-faq":
         documents, rejected = prepare_company_faq_rows(_load_company_faq(args.input))
+        output_rows = (document.as_ingestion_row() for document in documents)
+        manifest_rows = (document.as_manifest_row() for document in documents)
+        status = "PENDING_REVIEW"
+    elif args.source == "voc":
+        cases, rejected = prepare_voc_rows(_load_company_faq(args.input), source_name=args.input.stem)
+        output_rows = (case.as_quarantine_row() for case in cases)
+        manifest_rows = (case.as_quarantine_row() for case in cases)
+        status = "QUARANTINED"
     else:
         documents = prepare_markdown_file(
             args.input,
@@ -58,12 +67,16 @@ def main() -> int:
             document_version=args.document_version,
         )
         rejected = []
+        output_rows = (document.as_ingestion_row() for document in documents)
+        manifest_rows = (document.as_manifest_row() for document in documents)
+        status = "PENDING_REVIEW"
 
-    write_jsonl(args.output, (document.as_ingestion_row() for document in documents))
-    write_jsonl(args.manifest, (document.as_manifest_row() for document in documents))
+    write_jsonl(args.output, output_rows)
+    write_jsonl(args.manifest, manifest_rows)
     if args.rejects:
         write_jsonl(args.rejects, rejected)
-    print(f"prepared={len(documents)} rejected={len(rejected)} status=PENDING_REVIEW")
+    prepared_count = len(cases) if args.source == "voc" else len(documents)
+    print(f"prepared={prepared_count} rejected={len(rejected)} status={status}")
     return 0
 
 

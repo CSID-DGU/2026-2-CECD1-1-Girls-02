@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 
+from app.ai.handoff import requires_franchise_handoff
 from app.ai.models import DraftAction, DraftRequest, DraftResult, GenerationEvent, GenerationStatus
 from app.ai.ollama import OllamaClient, OllamaError
 from app.ai.prompting import PROMPT_VERSION, build_prompt
@@ -41,6 +42,8 @@ class DraftOrchestrator:
     def _required_escalation_reason(self, request: DraftRequest) -> str | None:
         if request.has_individual_order_context:
             return "Individual order/account verification is required."
+        if requires_franchise_handoff(request.inquiry_text):
+            return "Individual franchise consultation requires specialist review."
         if request.is_sensitive:
             return "Sensitive inquiry requires specialist review."
         if request.is_safety_related or any(term in request.inquiry_text for term in _RISK_TERMS):

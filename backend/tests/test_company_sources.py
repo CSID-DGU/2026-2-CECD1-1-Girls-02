@@ -51,7 +51,7 @@ def test_missing_required_faq_data_is_rejected_without_raw_text_in_audit():
     assert rejected == [{"line": 1, "reason": "missing required FAQ content"}]
 
 
-def test_policy_sections_are_pending_review_and_franchise_is_handoff_only():
+def test_policy_and_franchise_sections_are_pending_review_before_drafting():
     markdown = "# 제목\n\n## 혜택\n\n쿠폰 규칙\n\n## 예외\n\n중복 적용 불가"
     policy_documents = prepare_markdown_sections(
         markdown,
@@ -68,4 +68,4 @@ def test_policy_sections_are_pending_review_and_franchise_is_handoff_only():
     assert len(policy_documents) == 2
     assert all(item.review_status == "PENDING_REVIEW" for item in policy_documents)
     assert all(not draft_eligible(item) for item in policy_documents)
-    assert all(item.allowed_use == "HANDOFF_CONTEXT_ONLY" for item in franchise_documents)
+    assert all(item.allowed_use == "DRAFT_ONLY" for item in franchise_documents)
