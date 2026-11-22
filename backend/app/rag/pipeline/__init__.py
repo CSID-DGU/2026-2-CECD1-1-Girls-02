@@ -13,6 +13,7 @@ from .company_sources import (
     prepare_company_faq_rows,
     prepare_markdown_sections,
 )
+from .voc import PreparedVocCase, prepare_voc_rows
 
 __all__ = [
     "NormalizedRecord",
@@ -24,4 +25,6 @@ __all__ = [
     "draft_eligible",
     "prepare_company_faq_rows",
     "prepare_markdown_sections",
+    "PreparedVocCase",
+    "prepare_voc_rows",
 ]
