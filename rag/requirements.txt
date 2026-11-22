@@ -1,0 +1,8 @@
+# Direct runtime dependencies for the RAG ingestion and dense-retrieval baseline.
+# Install inside a project virtual environment; do not commit that environment.
+chromadb==1.0.0
+FlagEmbedding==1.4.2
+transformers==4.57.3
+sentence-transformers==3.4.1
+datasets==3.4.1
+huggingface-hub==0.36.2
