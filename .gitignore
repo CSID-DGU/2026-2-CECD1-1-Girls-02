@@ -24,6 +24,11 @@ coverage/
 # Local data and generated artifacts
 data/raw/
 data/private/
+backend/data/raw/
+backend/data/private/
+backend/artifacts/
+rag/data/
+rag/artifacts/
 *.sqlite3
 *.db
 chroma/
