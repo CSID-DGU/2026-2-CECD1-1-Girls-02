@@ -7,7 +7,7 @@ from hashlib import sha256
 import json
 from pathlib import Path
 import re
-from typing import Any, Iterable, Literal
+from typing import Any, Iterable, Literal, Protocol, Sequence
 
 OFFICIAL_COLLECTION = "brand_a_official_knowledge"
 VOC_COLLECTION = "brand_a_voc_cases"
@@ -38,6 +38,17 @@ class SourceRecord:
     source_url: str | None = None
     published_at: str | None = None
     category: str | None = None
+    document_id: str | None = None
+    raw_status: str | None = None
+    review_status: str | None = None
+    allowed_use: str | None = None
+    authority_level: str | None = None
+    document_type: str | None = None
+    business_domain: str | None = None
+
+
+class Embedder(Protocol):
+    def encode(self, texts: Sequence[str]) -> Sequence[Sequence[float]]: ...
 
 
 @dataclass(frozen=True)
@@ -69,6 +80,13 @@ def parse_record(payload: dict[str, Any], expected_source_type: str) -> SourceRe
         source_url=payload.get("source_url"),
         published_at=payload.get("published_at"),
         category=payload.get("category"),
+        document_id=payload.get("document_id"),
+        raw_status=payload.get("raw_status"),
+        review_status=payload.get("review_status"),
+        allowed_use=payload.get("allowed_use"),
+        authority_level=payload.get("authority_level"),
+        document_type=payload.get("doc_type"),
+        business_domain=payload.get("business_domain"),
     )
 
 
@@ -134,7 +152,16 @@ def make_chunks(record: SourceRecord, collection: str, *, chunk_size: int = 800,
             "document_version": record.document_version, "source_type": record.source_type,
             "usage_scope": usage, "chunk_index": index, "title": record.title,
             "content_sha256": sha256(content.encode("utf-8")).hexdigest(),
+            "document_id": record.document_id or record.source_id,
+            "knowledge_scope": "official" if expected == "official" else "voc",
+            "is_active": record.raw_status == "ACTIVE",
+            "review_status": record.review_status or "UNREVIEWED",
+            "allowed_use": record.allowed_use or usage,
         }
+        for key in ("authority_level", "document_type", "business_domain"):
+            value = getattr(record, key)
+            if isinstance(value, str) and value.strip():
+                metadata[key] = value.strip()
         for key in ("source_url", "published_at", "category"):
             value = getattr(record, key)
             if isinstance(value, str) and value.strip():
@@ -182,18 +209,51 @@ def write_artifacts(output_dir: Path, chunks: list[Chunk], audit: list[dict[str,
     write_jsonl(output_dir / "rejected_records.jsonl", rejects)
 
 
-def upsert_chroma(chunks: list[Chunk], *, collection: str, host: str = "localhost", port: int = 8001) -> None:
-    """Upsert deterministic IDs. chromadb is optional until an operator applies."""
+def _assert_indexable(chunks: list[Chunk], collection: str) -> None:
+    """Defence in depth: the approved file name is not an authorization boundary."""
+    if collection != OFFICIAL_COLLECTION:
+        raise IngestionError("VOC indexing is disabled in the initial customer-answer baseline")
+    for chunk in chunks:
+        metadata = chunk.metadata
+        if (
+            metadata.get("knowledge_scope") != "official"
+            or metadata.get("is_active") is not True
+            or metadata.get("review_status") != "APPROVED"
+            or metadata.get("allowed_use") != OFFICIAL_USAGE
+        ):
+            raise IngestionError("only active, approved, DRAFT_ONLY official chunks may be indexed")
+
+
+def upsert_chroma(chunks: list[Chunk], *, collection: str, embedder: Embedder, host: str = "localhost", port: int = 8001) -> None:
+    """Index BGE-M3 vectors and remove superseded versions for each logical document."""
     if collection not in ALLOWED_COLLECTIONS:
         raise IngestionError("unsupported collection")
+    _assert_indexable(chunks, collection)
     try:
         import chromadb  # type: ignore[import-not-found]
     except ImportError as error:
         raise RuntimeError("Install chromadb before using --apply") from error
     target = chromadb.HttpClient(host=host, port=port).get_or_create_collection(name=collection)
+    versions = {(str(item.metadata["document_id"]), str(item.metadata["document_version"])) for item in chunks}
+    for document_id, current_version in versions:
+        existing = target.get(where={"document_id": document_id}, include=["metadatas"])
+        stale_ids = [
+            item_id
+            for item_id, metadata in zip(existing.get("ids", []), existing.get("metadatas", []), strict=True)
+            if metadata and str(metadata.get("document_version")) != current_version
+        ]
+        if stale_ids:
+            target.delete(ids=stale_ids)
     for start in range(0, len(chunks), 100):
         batch = chunks[start : start + 100]
-        target.upsert(ids=[item.id for item in batch], documents=[item.text for item in batch], metadatas=[item.metadata for item in batch])
+        documents = [item.text for item in batch]
+        embeddings = embedder.encode(documents)
+        target.upsert(
+            ids=[item.id for item in batch],
+            documents=documents,
+            embeddings=list(embeddings),
+            metadatas=[item.metadata for item in batch],
+        )
 
 
 def verify_chroma(expected_ids: list[str], *, collection: str, host: str = "localhost", port: int = 8001) -> None:

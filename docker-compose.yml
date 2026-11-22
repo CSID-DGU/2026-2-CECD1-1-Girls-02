@@ -18,7 +18,7 @@ services:
       retries: 10
 
   chroma:
-    image: chromadb/chroma:latest
+    image: chromadb/chroma:1.0.0
     environment:
       IS_PERSISTENT: "TRUE"
       PERSIST_DIRECTORY: /chroma/chroma

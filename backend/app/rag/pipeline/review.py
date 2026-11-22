@@ -105,4 +105,20 @@ def apply_review_decisions(
         and metadata.get("review_status") == "APPROVED"
         and metadata.get("allowed_use") == "DRAFT_ONLY"
     ]
-    return [documents[source_id] for source_id in approved_ids], list(manifests.values())
+    index_metadata_fields = (
+        "raw_status",
+        "review_status",
+        "allowed_use",
+        "authority_level",
+        "doc_type",
+        "business_domain",
+        "document_version",
+    )
+    approved_rows = []
+    for source_id in approved_ids:
+        document = dict(documents[source_id])
+        metadata = manifests[source_id]
+        document.update({field: metadata[field] for field in index_metadata_fields if field in metadata})
+        document["document_id"] = source_id
+        approved_rows.append(document)
+    return approved_rows, list(manifests.values())

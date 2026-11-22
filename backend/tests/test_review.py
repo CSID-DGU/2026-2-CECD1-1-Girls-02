@@ -24,7 +24,11 @@ def test_approved_active_document_is_the_only_document_exported_for_indexing():
 
     approved, updated = apply_review_decisions(documents, manifest, decisions)
 
-    assert approved == [documents[0]]
+    assert len(approved) == 1
+    assert approved[0]["source_id"] == "faq:1"
+    assert approved[0]["title"] == "활성 FAQ"
+    assert approved[0]["review_status"] == "APPROVED"
+    assert approved[0]["document_id"] == "faq:1"
     assert updated[0]["reviewed_by"] == "sophie-24"
     assert updated[0]["review_status"] == "APPROVED"
 

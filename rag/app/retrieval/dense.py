@@ -16,17 +16,20 @@ class Embedder(Protocol):
 class BgeM3Embedder:
     """Lazy BGE-M3 adapter, keeping the core retriever free of ML dependencies."""
 
-    def __init__(self, model_name: str = "BAAI/bge-m3") -> None:
+    def __init__(self, model_name: str = "BAAI/bge-m3", use_fp16: bool | None = None) -> None:
         self.model_name = model_name
+        self.use_fp16 = use_fp16
         self._model: Any | None = None
 
     def encode(self, texts: Sequence[str]) -> Sequence[Sequence[float]]:
         if self._model is None:
             try:
                 from FlagEmbedding import BGEM3FlagModel
+                import torch
             except ImportError as exc:  # pragma: no cover - deployment dependency
                 raise RuntimeError("Install FlagEmbedding to use BGE-M3") from exc
-            self._model = BGEM3FlagModel(self.model_name, use_fp16=True)
+            use_fp16 = torch.cuda.is_available() if self.use_fp16 is None else self.use_fp16
+            self._model = BGEM3FlagModel(self.model_name, use_fp16=use_fp16)
         return self._model.encode(list(texts), return_dense=True)["dense_vecs"]
 
 

@@ -29,6 +29,15 @@ class IngestionTests(unittest.TestCase):
         self.assertTrue(chunks)
         self.assertTrue(all(len(chunk) <= 40 for chunk in chunks))
 
+    def test_approved_official_chunk_carries_retrieval_filter_metadata(self):
+        record = parse_record({"source_id": "faq-001", "document_id": "faq-001", "title": "Synthetic FAQ", "text": "Approved text.", "document_version": "2026-01", "source_type": "official", "raw_status": "ACTIVE", "review_status": "APPROVED", "allowed_use": "DRAFT_ONLY", "doc_type": "FAQ", "authority_level": "OFFICIAL_FAQ", "business_domain": "GENERAL"}, "official")
+        chunks, _ = make_chunks(record, OFFICIAL_COLLECTION)
+        metadata = chunks[0].metadata
+        self.assertEqual(metadata["knowledge_scope"], "official")
+        self.assertTrue(metadata["is_active"])
+        self.assertEqual(metadata["review_status"], "APPROVED")
+        self.assertEqual(metadata["document_type"], "FAQ")
+
 
 if __name__ == "__main__":
     unittest.main()

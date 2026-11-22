@@ -25,7 +25,15 @@ def main() -> int:
     chunks, audit = build_artifacts(records, args.collection, chunk_size=args.chunk_size, overlap=args.overlap)
     write_artifacts(args.output_dir, chunks, audit, rejects)
     if args.apply:
-        upsert_chroma(chunks, collection=args.collection, host=args.host, port=args.port)
+        from app.retrieval.dense import BgeM3Embedder
+
+        upsert_chroma(
+            chunks,
+            collection=args.collection,
+            embedder=BgeM3Embedder(),
+            host=args.host,
+            port=args.port,
+        )
         verify_chroma([chunk.id for chunk in chunks], collection=args.collection, host=args.host, port=args.port)
     print(f"records={len(records)} chunks={len(chunks)} rejected={len(rejects)} applied={args.apply}")
     return 0
