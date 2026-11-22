@@ -26,6 +26,21 @@ def test_order_context_is_escalated_without_model_call() -> None:
     assert not hasattr(client, "prompt")
 
 
+def test_general_franchise_question_can_create_a_draft() -> None:
+    client = FakeOllama('{"action":"DRAFT_FOR_REVIEW","draft_text":"안내드립니다.","escalation_reason":null,"cited_source_ids":["policy-1"]}')
+    result = DraftOrchestrator(client).create_draft(DraftRequest("창업 절차가 궁금합니다.", [OFFICIAL]))
+    assert result.action is DraftAction.DRAFT_FOR_REVIEW
+    assert hasattr(client, "prompt")
+
+
+def test_individual_franchise_consultation_is_escalated_without_model_call() -> None:
+    client = FakeOllama("not used")
+    result = DraftOrchestrator(client).create_draft(DraftRequest("우리 동네에 창업 상담 신청하고 싶어요.", [OFFICIAL]))
+    assert result.action is DraftAction.ESCALATE
+    assert result.event.status is GenerationStatus.RULE_ESCALATED
+    assert not hasattr(client, "prompt")
+
+
 def test_draft_requires_official_citation() -> None:
     client = FakeOllama('{"action":"DRAFT_FOR_REVIEW","draft_text":"안내드립니다.","escalation_reason":null,"cited_source_ids":["policy-1"]}')
     result = DraftOrchestrator(client).create_draft(DraftRequest("환불은 어떻게 되나요?", [OFFICIAL]))

@@ -161,7 +161,7 @@ def policy_profile(source_kind: Literal["policy", "guide", "franchise"], busines
         return SourceProfile("POLICY", "PRIMARY_POLICY", "DRAFT_ONLY", business_domain)
     if source_kind == "guide":
         return SourceProfile("GUIDE", "SUPPORTING_GUIDE", "DRAFT_ONLY", business_domain)
-    return SourceProfile("GUIDE", "SUPPORTING_GUIDE", "HANDOFF_CONTEXT_ONLY", "FRANCHISE")
+    return SourceProfile("GUIDE", "SUPPORTING_GUIDE", "DRAFT_ONLY", "FRANCHISE")
 
 
 def prepare_markdown_sections(
