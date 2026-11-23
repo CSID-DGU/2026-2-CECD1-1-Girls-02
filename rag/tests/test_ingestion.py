@@ -8,7 +8,7 @@ from app.ingestion import OFFICIAL_COLLECTION, VOC_COLLECTION, IngestionError, c
 
 class IngestionTests(unittest.TestCase):
     def test_masks_direct_identifiers_before_chunking(self):
-        record = parse_record({"source_id": "faq-001", "title": "Synthetic FAQ", "text": "문의는 test@example.com 또는 010-1234-5678로 주세요.", "document_version": "2026-01", "source_type": "official"}, "official")
+        record = parse_record({"source_id": "faq-001", "title": "Synthetic FAQ", "text": "문의는 test@example.com 또는 010-1234-5678로 주세요.", "document_version": "2026-01", "source_type": "official", "category": "GENERAL"}, "official")
         chunks, counts = make_chunks(record, OFFICIAL_COLLECTION)
         self.assertEqual(counts, {"email": 1, "phone": 1})
         self.assertNotIn("test@example.com", chunks[0].text)
@@ -30,13 +30,27 @@ class IngestionTests(unittest.TestCase):
         self.assertTrue(all(len(chunk) <= 40 for chunk in chunks))
 
     def test_approved_official_chunk_carries_retrieval_filter_metadata(self):
-        record = parse_record({"source_id": "faq-001", "document_id": "faq-001", "title": "Synthetic FAQ", "text": "Approved text.", "document_version": "2026-01", "source_type": "official", "raw_status": "ACTIVE", "review_status": "APPROVED", "allowed_use": "DRAFT_ONLY", "doc_type": "FAQ", "authority_level": "OFFICIAL_FAQ", "business_domain": "GENERAL"}, "official")
+        record = parse_record({"source_id": "faq-001", "document_id": "faq-001", "title": "Synthetic FAQ", "text": "Approved text.", "document_version": "2026-01", "source_type": "official", "category": "membership", "raw_status": "ACTIVE", "review_status": "APPROVED", "allowed_use": "DRAFT_ONLY", "doc_type": "FAQ", "authority_level": "OFFICIAL_FAQ", "business_domain": "GENERAL"}, "official")
         chunks, _ = make_chunks(record, OFFICIAL_COLLECTION)
         metadata = chunks[0].metadata
         self.assertEqual(metadata["knowledge_scope"], "official")
         self.assertTrue(metadata["is_active"])
         self.assertEqual(metadata["review_status"], "APPROVED")
         self.assertEqual(metadata["document_type"], "FAQ")
+        self.assertEqual(metadata["category"], "MEMBERSHIP")
+
+    def test_rejects_official_record_without_category(self):
+        with self.assertRaisesRegex(IngestionError, "category"):
+            parse_record(
+                {
+                    "source_id": "faq-001",
+                    "title": "Synthetic FAQ",
+                    "text": "Approved text.",
+                    "document_version": "2026-01",
+                    "source_type": "official",
+                },
+                "official",
+            )
 
 
 if __name__ == "__main__":

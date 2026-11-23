@@ -14,7 +14,6 @@ VOC_COLLECTION = "brand_a_voc_cases"
 ALLOWED_COLLECTIONS = {OFFICIAL_COLLECTION, VOC_COLLECTION}
 OFFICIAL_USAGE = "DRAFT_ONLY"
 VOC_USAGE = "AGENT_REFERENCE_ONLY"
-
 _PII_PATTERNS = (
     ("email", re.compile(r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", re.I)),
     ("phone", re.compile(r"(?<!\d)(?:\+82[- ]?)?0?1[0-9][- ]?\d{3,4}[- ]?\d{4}(?!\d)")),
@@ -64,6 +63,17 @@ def _required(value: Any, name: str) -> str:
     return value.strip()
 
 
+def _category(value: Any) -> str:
+    """Return the agreed search category or reject an unclassified record.
+
+    ``GENERAL`` is an intentional, searchable fallback assigned by the source
+    preparation pipeline.  A missing value is different: it would make a
+    category-filtered search silently omit the document.
+    """
+    category = _required(value, "category").upper()
+    return category
+
+
 def parse_record(payload: dict[str, Any], expected_source_type: str) -> SourceRecord:
     """Validate one approved input record without retaining its raw payload."""
     source_type = _required(payload.get("source_type"), "source_type")
@@ -79,7 +89,7 @@ def parse_record(payload: dict[str, Any], expected_source_type: str) -> SourceRe
         source_type=source_type,  # type: ignore[arg-type]
         source_url=payload.get("source_url"),
         published_at=payload.get("published_at"),
-        category=payload.get("category"),
+        category=_category(payload.get("category")) if source_type == "official" else payload.get("category"),
         document_id=payload.get("document_id"),
         raw_status=payload.get("raw_status"),
         review_status=payload.get("review_status"),
@@ -142,6 +152,8 @@ def make_chunks(record: SourceRecord, collection: str, *, chunk_size: int = 800,
     expected = "official" if collection == OFFICIAL_COLLECTION else "voc"
     if record.source_type != expected:
         raise IngestionError("source type and collection are incompatible")
+    if expected == "official" and not record.category:
+        raise IngestionError("official records require category")
     masked, pii_counts = mask_pii(record.text)
     usage = OFFICIAL_USAGE if expected == "official" else VOC_USAGE
     chunks = []
@@ -220,8 +232,12 @@ def _assert_indexable(chunks: list[Chunk], collection: str) -> None:
             or metadata.get("is_active") is not True
             or metadata.get("review_status") != "APPROVED"
             or metadata.get("allowed_use") != OFFICIAL_USAGE
+            or not isinstance(metadata.get("category"), str)
+            or not str(metadata["category"]).strip()
         ):
-            raise IngestionError("only active, approved, DRAFT_ONLY official chunks may be indexed")
+            raise IngestionError(
+                "only active, approved, categorized DRAFT_ONLY official chunks may be indexed"
+            )
 
 
 def upsert_chroma(chunks: list[Chunk], *, collection: str, embedder: Embedder, host: str = "localhost", port: int = 8001) -> None:
