@@ -21,11 +21,11 @@ services:
     image: chromadb/chroma:1.0.0
     environment:
       IS_PERSISTENT: "TRUE"
-      PERSIST_DIRECTORY: /chroma/chroma
+      PERSIST_DIRECTORY: /data
     ports:
       - "${CHROMA_PORT}:8000"
     volumes:
-      - chroma_data:/chroma/chroma
+      - chroma_data:/data
 
 volumes:
   postgres_data:
