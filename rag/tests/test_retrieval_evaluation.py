@@ -14,7 +14,14 @@ def test_chatbot_cannot_query_voc() -> None:
 
 
 def test_chroma_filter_always_scopes_results() -> None:
-    assert chroma_where(SearchFilter(scope=KnowledgeScope.OFFICIAL)) == {"$and": [{"knowledge_scope": "official"}, {"is_active": True}]}
+    assert chroma_where(SearchFilter(scope=KnowledgeScope.OFFICIAL)) == {
+        "$and": [
+            {"knowledge_scope": "official"},
+            {"is_active": True},
+            {"review_status": "APPROVED"},
+            {"allowed_use": "DRAFT_ONLY"},
+        ]
+    }
 
 
 def test_gt_rejects_embedded_source_text() -> None:
