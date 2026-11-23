@@ -25,6 +25,9 @@ coverage/
 # Local data and generated artifacts
 data/raw/
 data/private/
+data/*.json
+data/*.jsonl
+data/rag-build/
 backend/data/raw/
 backend/data/private/
 backend/artifacts/

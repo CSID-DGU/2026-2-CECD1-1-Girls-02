@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .contracts import SearchFilter
+from .contracts import KnowledgeScope, SearchFilter
 
 
 def chroma_where(filters: SearchFilter) -> dict[str, Any]:
@@ -10,6 +10,8 @@ def chroma_where(filters: SearchFilter) -> dict[str, Any]:
     clauses: list[dict[str, Any]] = [{"knowledge_scope": filters.scope.value}]
     if filters.active_only:
         clauses.append({"is_active": True})
+    if filters.scope is KnowledgeScope.OFFICIAL:
+        clauses.extend(({"review_status": "APPROVED"}, {"allowed_use": "DRAFT_ONLY"}))
     if filters.document_types:
         clauses.append({"document_type": {"$in": list(filters.document_types)}})
     if filters.locales:
