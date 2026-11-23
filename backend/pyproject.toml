@@ -20,6 +20,13 @@ dev = [
     "httpx>=0.27,<1.0",
     "ruff>=0.8,<1.0",
 ]
+agent = [
+    "langgraph>=0.2,<1.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+exclude = ["data*", "tests*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
