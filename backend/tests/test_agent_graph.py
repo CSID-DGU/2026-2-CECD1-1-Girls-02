@@ -6,6 +6,7 @@ from app.ai.context import RetrievedChunk
 from app.ai.models import DraftAction, GenerationStatus
 from app.ai.ollama import OllamaGeneration
 from app.ai.orchestrator import DraftOrchestrator
+from app.ai.retrieval_adapter import OfficialRetrievalUnavailable
 
 
 class FakeSearch:
@@ -31,6 +32,11 @@ class FakeOllama:
         self.calls += 1
         self.prompt = prompt
         return OllamaGeneration(text=self.text, latency_ms=12)
+
+
+class UnavailableSearch:
+    def search_official(self, query: str, *, top_k: int) -> list[RetrievedChunk]:
+        raise OfficialRetrievalUnavailable("Chroma is unavailable")
 
 
 def _official_hit() -> RetrievedChunk:
@@ -104,6 +110,17 @@ class AgentGraphTests(unittest.TestCase):
         self.assertIs(result["result"].event.status, GenerationStatus.INVALID_MODEL_OUTPUT)
         self.assertEqual(search.calls, 1)
         self.assertEqual(client.calls, 1)
+
+    def test_retrieval_outage_escalates_without_calling_the_model(self):
+        client = FakeOllama("not used")
+        result = self._graph(UnavailableSearch(), client).invoke(
+            {"inquiry_text": "멤버십 혜택이 궁금해요."}
+        )
+
+        self.assertIs(result["result"].action, DraftAction.ESCALATE)
+        self.assertIs(result["result"].event.status, GenerationStatus.RULE_ESCALATED)
+        self.assertIn("search is unavailable", result["result"].escalation_reason)
+        self.assertEqual(client.calls, 0)
 
 
 if __name__ == "__main__":
