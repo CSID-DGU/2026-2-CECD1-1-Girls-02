@@ -10,7 +10,7 @@ if importlib.util.find_spec("httpx") is None:  # Adapter tests do not execute Ol
     sys.modules["httpx"] = ModuleType("httpx")
 
 from app.ai.agent import OfficialKnowledgeSearch
-from app.ai.retrieval_adapter import OfficialRetrievalAdapter
+from app.ai.retrieval_adapter import OfficialRetrievalAdapter, OfficialRetrievalUnavailable
 from rag.app.retrieval.contracts import (
     KnowledgeScope,
     SearchHit,
@@ -107,16 +107,16 @@ class OfficialRetrievalAdapterTests(unittest.TestCase):
         service = FakeRetrievalService(SearchResponse((), elapsed_ms=1.0))
         self.assertEqual(OfficialRetrievalAdapter(service).search_official("질문", top_k=5), ())
 
-    def test_does_not_hide_retrieval_errors(self) -> None:
+    def test_translates_expected_retrieval_errors_to_safe_agent_boundary(self) -> None:
         error = OfficialSearchExecutionError("embedding failed")
         service = FakeRetrievalService(error=error)
 
-        with self.assertRaises(OfficialSearchExecutionError) as raised:
+        with self.assertRaises(OfficialRetrievalUnavailable) as raised:
             OfficialRetrievalAdapter(service).search_official("질문", top_k=5)
 
-        self.assertIs(raised.exception, error)
+        self.assertIs(raised.exception.__cause__, error)
 
-    def test_connect_does_not_hide_connection_or_collection_errors(self) -> None:
+    def test_connect_translates_connection_or_collection_errors(self) -> None:
         errors = (
             ChromaConnectionError("connection failed"),
             OfficialCollectionNotFoundError("collection missing"),
@@ -127,9 +127,9 @@ class OfficialRetrievalAdapterTests(unittest.TestCase):
                     "app.ai.retrieval_adapter.OfficialKnowledgeSearchService.connect",
                     side_effect=error,
                 ):
-                    with self.assertRaises(type(error)) as raised:
+                    with self.assertRaises(OfficialRetrievalUnavailable) as raised:
                         OfficialRetrievalAdapter.connect()
-                self.assertIs(raised.exception, error)
+                self.assertIs(raised.exception.__cause__, error)
 
     def test_invalid_input_is_rejected_by_existing_search_request_contract(self) -> None:
         adapter = OfficialRetrievalAdapter(FakeRetrievalService())

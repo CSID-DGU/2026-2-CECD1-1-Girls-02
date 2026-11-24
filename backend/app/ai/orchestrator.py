@@ -50,6 +50,8 @@ class DraftOrchestrator:
             return "Safety or urgent-risk inquiry requires immediate human handling."
         if request.is_urgent:
             return "Urgent inquiry requires human handling."
+        if request.retrieval_failed:
+            return "Official knowledge search is unavailable; agent review is required."
         if not request.official_evidence:
             return "No authoritative official evidence is available."
         return None
