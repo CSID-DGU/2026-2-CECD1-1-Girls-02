@@ -39,6 +39,7 @@ class DraftRequest:
     is_sensitive: bool = False
     is_safety_related: bool = False
     is_urgent: bool = False
+    retrieval_failed: bool = False
 
 
 @dataclass(frozen=True)

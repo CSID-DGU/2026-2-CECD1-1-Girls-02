@@ -10,7 +10,15 @@ from rag.app.retrieval.contracts import (
     SearchHit,
     SearchRequest,
 )
-from rag.app.retrieval.official import OfficialKnowledgeSearchService, OfficialSearchSettings
+from rag.app.retrieval.official import (
+    OfficialKnowledgeSearchService,
+    OfficialSearchError,
+    OfficialSearchSettings,
+)
+
+
+class OfficialRetrievalUnavailable(RuntimeError):
+    """Expected RAG-service failure that must prevent automatic answering."""
 
 
 class OfficialRetrievalAdapter:
@@ -23,7 +31,10 @@ class OfficialRetrievalAdapter:
     def connect(
         cls, settings: OfficialSearchSettings | None = None
     ) -> "OfficialRetrievalAdapter":
-        return cls(OfficialKnowledgeSearchService.connect(settings))
+        try:
+            return cls(OfficialKnowledgeSearchService.connect(settings))
+        except OfficialSearchError as error:
+            raise OfficialRetrievalUnavailable("Official knowledge retrieval is unavailable") from error
 
     def search_official(self, query: str, *, top_k: int) -> tuple[RetrievedChunk, ...]:
         request = SearchRequest(
@@ -32,7 +43,10 @@ class OfficialRetrievalAdapter:
             top_k=top_k,
             caller="agent",
         )
-        response = self._service.search(request)
+        try:
+            response = self._service.search(request)
+        except OfficialSearchError as error:
+            raise OfficialRetrievalUnavailable("Official knowledge retrieval is unavailable") from error
         return tuple(self._to_retrieved_chunk(hit) for hit in response.hits)
 
     @staticmethod

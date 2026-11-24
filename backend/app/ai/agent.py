@@ -8,6 +8,7 @@ from app.ai.context import ContextBuildResult, RetrievedChunk, build_official_co
 from app.ai.handoff import requires_franchise_handoff
 from app.ai.models import DraftRequest, DraftResult
 from app.ai.orchestrator import DraftOrchestrator
+from app.ai.retrieval_adapter import OfficialRetrievalUnavailable
 
 
 class OfficialKnowledgeSearch(Protocol):
@@ -22,6 +23,7 @@ class AgentState(TypedDict, total=False):
     is_sensitive: bool
     is_safety_related: bool
     is_urgent: bool
+    retrieval_failed: bool
     context: ContextBuildResult
     result: DraftResult
 
@@ -44,6 +46,7 @@ def _request_from_state(state: AgentState, context: ContextBuildResult | None = 
         is_sensitive=state.get("is_sensitive", False),
         is_safety_related=state.get("is_safety_related", False),
         is_urgent=state.get("is_urgent", False),
+        retrieval_failed=state.get("retrieval_failed", False),
     )
 
 
@@ -66,8 +69,12 @@ def build_rag_agent_graph(
     def route_after_classify(state: AgentState) -> str:
         return "handoff" if _needs_rule_handoff(state) else "retrieve"
 
-    def retrieve(state: AgentState) -> dict[str, ContextBuildResult]:
-        hits = search.search_official(state["inquiry_text"], top_k=top_k)
+    def retrieve(state: AgentState) -> dict[str, object]:
+        try:
+            hits = search.search_official(state["inquiry_text"], top_k=top_k)
+        except OfficialRetrievalUnavailable:
+            # A retrieval outage must never fall through to a model-generated answer.
+            return {"context": build_official_context([]), "retrieval_failed": True}
         return {"context": build_official_context(hits, max_chunks=top_k)}
 
     def route_after_retrieve(state: AgentState) -> str:
