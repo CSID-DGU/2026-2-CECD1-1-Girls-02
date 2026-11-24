@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     app_name: str = "eVOC API"
     app_env: str = "local"
     app_version: str = "0.1.0"
+    database_url: str | None = None
 
     model_config = SettingsConfigDict(
         env_file=REPOSITORY_ROOT / ".env",
