@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "llama3.1:8b"
     ollama_timeout_seconds: float = 20.0
+    database_url: str | None = None
 
     model_config = SettingsConfigDict(
         env_file=REPOSITORY_ROOT / ".env",
