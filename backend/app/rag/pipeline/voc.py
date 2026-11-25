@@ -41,11 +41,16 @@ class PreparedVocCase:
         row = {
             "source_id": self.source_id,
             "source_type": "voc",
-            "usage_scope": "AGENT_DRAFT_ONLY",
+            # This corpus is for an administrator/agent's case-reference view.
+            # It is deliberately not eligible as evidence for a customer draft.
+            "usage_scope": "AGENT_REFERENCE_ONLY",
+            "allowed_use": "AGENT_REFERENCE_ONLY",
             "category_path": self.category_path,
             "case_status": self.case_status,
             "exclusion_reason": self.exclusion_reason or "",
             "source_updated_at": self.source_updated_at or "",
+            "document_version": self.source_updated_at or "voc-quarantined-v1",
+            "doc_type": "VOC_CASE",
         }
         if self.text:
             row["title"] = self.title

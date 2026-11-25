@@ -3,7 +3,15 @@ from pathlib import Path
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from app.ingestion import OFFICIAL_COLLECTION, VOC_COLLECTION, IngestionError, chunk_text, make_chunks, parse_record
+from app.ingestion import (
+    OFFICIAL_COLLECTION,
+    VOC_COLLECTION,
+    IngestionError,
+    _assert_indexable,
+    chunk_text,
+    make_chunks,
+    parse_record,
+)
 
 
 class IngestionTests(unittest.TestCase):
@@ -15,9 +23,16 @@ class IngestionTests(unittest.TestCase):
         self.assertEqual(chunks[0].metadata["usage_scope"], "DRAFT_ONLY")
 
     def test_voc_is_never_policy_scope(self):
-        record = parse_record({"source_id": "case-001", "title": "Synthetic case", "text": "No personal data.", "document_version": "2026-01", "source_type": "voc"}, "voc")
+        record = parse_record({"source_id": "case-001", "title": "Synthetic case", "text": "No personal data.", "document_version": "2026-01", "source_type": "voc", "case_status": "READY_FOR_REVIEW", "allowed_use": "AGENT_REFERENCE_ONLY"}, "voc")
         chunks, _ = make_chunks(record, VOC_COLLECTION)
         self.assertEqual(chunks[0].metadata["usage_scope"], "AGENT_REFERENCE_ONLY")
+        _assert_indexable(chunks, VOC_COLLECTION)
+
+    def test_voc_not_ready_for_review_cannot_be_indexed(self):
+        record = parse_record({"source_id": "case-001", "title": "Synthetic case", "text": "No personal data.", "document_version": "2026-01", "source_type": "voc", "case_status": "EXCLUDED", "allowed_use": "AGENT_REFERENCE_ONLY"}, "voc")
+        chunks, _ = make_chunks(record, VOC_COLLECTION)
+        with self.assertRaisesRegex(IngestionError, "READY_FOR_REVIEW"):
+            _assert_indexable(chunks, VOC_COLLECTION)
 
     def test_rejects_collection_mismatch(self):
         record = parse_record({"source_id": "case-001", "title": "Synthetic case", "text": "Text", "document_version": "v1", "source_type": "voc"}, "voc")

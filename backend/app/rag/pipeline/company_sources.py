@@ -14,6 +14,7 @@ import re
 from typing import Any, Literal
 
 from .normalization import NormalizationError, _clean_text, _optional, _required
+from .branding import rebrand_franchise_section, rebrand_text, rebrand_user_faq_section
 
 
 ReviewStatus = Literal["APPROVED", "PENDING_REVIEW", "EXCLUDED"]
@@ -32,6 +33,7 @@ _CATEGORY_CODES = {
     "배달 관련": "DELIVERY",
 }
 _SECTION_HEADING = re.compile(r"^#{1,2}\s+(.+?)\s*$", re.MULTILINE)
+_SANITIZED_SUPPORT_PHONE = re.compile(r"(?<!\d)070[-\s]?(?:\d{3,4}|\*{3,4})[-\s]?\d{4}(?!\d)")
 
 
 @dataclass(frozen=True)
@@ -106,11 +108,15 @@ def category_code(category_name: str | None) -> str:
     return _CATEGORY_CODES.get((category_name or "").strip(), "GENERAL")
 
 
+def _sanitize_customer_facing_text(value: str) -> str:
+    return _SANITIZED_SUPPORT_PHONE.sub("070-0000-0000", value)
+
+
 def prepare_company_faq(row: Mapping[str, Any]) -> PreparedDocument:
     """Prepare a row from the company's FAQ export without using attachments."""
     external_id = _required(row, "FAQ id", "id")
-    question = _required(row, "FAQ title", "title")
-    answer = _required(row, "FAQ content", "content")
+    question = rebrand_text(_sanitize_customer_facing_text(_required(row, "FAQ title", "title")))
+    answer = rebrand_text(_sanitize_customer_facing_text(_required(row, "FAQ content", "content")))
     active = row.get("active")
     if not isinstance(active, bool):
         raise NormalizationError("FAQ active must be a boolean")
@@ -122,7 +128,7 @@ def prepare_company_faq(row: Mapping[str, Any]) -> PreparedDocument:
         source_id=f"faq:{external_id}",
         title=f"FAQ: {question}",
         text=f"카테고리: {category_code(_optional(row, 'categoryName'))}\n질문: {question}\n답변: {answer}",
-        document_version=updated_at or "unspecified",
+        document_version=f"{updated_at or 'unspecified'}-dongguk-v1",
         source_type="official",
         category_code=category_code(_optional(row, "categoryName")),
         raw_status=raw_status,
@@ -174,7 +180,8 @@ def _is_structural_heading(title: str) -> bool:
 
 
 def prepare_markdown_sections(
-    text: str, *, source_name: str, profile: SourceProfile, document_version: str = "unspecified"
+    text: str, *, source_name: str, profile: SourceProfile, document_version: str = "unspecified",
+    source_id_key: str | None = None,
 ) -> list[PreparedDocument]:
     """Split a vetted Markdown source at level-1 or level-2 headings.
 
@@ -182,18 +189,22 @@ def prepare_markdown_sections(
     (for example, the membership stamp policy). Accepting both levels prevents
     that section from silently disappearing from review.
     """
-    cleaned_source_name = _clean_text(source_name)
+    cleaned_source_name = rebrand_text(_sanitize_customer_facing_text(_clean_text(source_name)))
     if not cleaned_source_name:
         raise NormalizationError("missing source name")
     matches = list(_SECTION_HEADING.finditer(text))
     if not matches:
         raise NormalizationError("Markdown source must contain at least one level-1 or level-2 heading")
-    document_key = sha256(cleaned_source_name.encode("utf-8")).hexdigest()[:12]
+    document_key = sha256((source_id_key or cleaned_source_name).encode("utf-8")).hexdigest()[:12]
     documents: list[PreparedDocument] = []
     for index, match in enumerate(matches):
-        section_title = _clean_text(match.group(1))
+        section_title = rebrand_text(_sanitize_customer_facing_text(_clean_text(match.group(1))))
         next_start = matches[index + 1].start() if index + 1 < len(matches) else len(text)
-        section_body = _clean_text(text[match.end() : next_start])
+        section_body = rebrand_text(_sanitize_customer_facing_text(_clean_text(text[match.end() : next_start])))
+        if profile.business_domain == "FRANCHISE":
+            section_body = rebrand_franchise_section(section_title, section_body)
+        elif "사용자 FAQ" in cleaned_source_name:
+            section_body = rebrand_user_faq_section(section_title, section_body)
         if not section_body or _is_structural_heading(section_title):
             continue
         documents.append(
@@ -220,12 +231,13 @@ def prepare_markdown_sections(
 
 def prepare_markdown_file(
     path: Path, *, source_kind: Literal["policy", "guide", "franchise", "faq-guide"], business_domain: str,
-    document_version: str = "unspecified",
+    document_version: str = "unspecified", source_name: str | None = None, source_id_key: str | None = None,
 ) -> list[PreparedDocument]:
     """Read an approved Markdown file; its path is never emitted as metadata."""
     return prepare_markdown_sections(
         path.read_text(encoding="utf-8"),
-        source_name=path.stem,
+        source_name=source_name or path.stem,
         profile=policy_profile(source_kind, business_domain),
         document_version=document_version,
+        source_id_key=source_id_key,
     )
