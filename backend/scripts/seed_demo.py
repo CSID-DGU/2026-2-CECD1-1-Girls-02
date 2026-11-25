@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))  # 레포 루트 (rag 패키지)
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
