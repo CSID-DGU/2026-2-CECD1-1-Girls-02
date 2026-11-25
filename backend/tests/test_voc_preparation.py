@@ -28,6 +28,24 @@ def test_voc_uses_allow_list_and_never_emits_identity_or_internal_fields():
     assert "internal note" not in str(row)
 
 
+def test_voc_masks_contact_identifiers_written_inside_customer_text():
+    case = prepare_voc_case(
+        {
+            "id": 15,
+            "title": "연락 요청 010-9876-5432",
+            "content": "답변은 help@example.com 또는 010 9876 5432로 부탁드립니다.",
+            "answer": "help@example.com으로 회신했습니다.",
+        },
+        source_name="web-voc",
+    )
+
+    row = case.as_quarantine_row()
+    assert "010-9876-5432" not in str(row)
+    assert "help@example.com" not in str(row)
+    assert "[REDACTED_PHONE]" in str(row)
+    assert "[REDACTED_EMAIL]" in str(row)
+
+
 def test_order_and_safety_cases_are_excluded_from_voc_reference_artifacts():
     order = prepare_voc_case(
         {"id": 11, "title": "주문 문의", "content": "주문번호: ABCD1234", "answer": "확인"},
