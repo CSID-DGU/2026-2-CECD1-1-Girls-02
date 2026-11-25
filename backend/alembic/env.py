@@ -8,8 +8,7 @@ from alembic import context
 from app.core.config import get_settings
 from app.db.base import Base
 
-# Step 6에서 테이블 모델 추가 예정
-# from app.db import models  # noqa: F401
+from app.db import models  # noqa: F401
 
 config = context.config
 
