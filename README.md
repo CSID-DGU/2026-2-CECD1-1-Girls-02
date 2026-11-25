@@ -31,3 +31,13 @@ PostgreSQL은 `localhost:5432`, Chroma는 `localhost:8001`에서 접근합니다
 ```bash
 docker compose down
 ```
+
+## Backend 실행
+
+```bash
+cd backend
+pip install -e ".[dev]"
+alembic upgrade head        # 테이블 생성·갱신
+python scripts/seed_demo.py # 시연용 기준 데이터 (가상 예시)
+uvicorn app.main:app --reload # http://localhost:8000/docs
+```
