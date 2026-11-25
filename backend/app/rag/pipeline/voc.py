@@ -18,6 +18,8 @@ from .normalization import NormalizationError, _clean_text, _optional, _required
 _ORDER_OR_ACCOUNT = re.compile(
     r"(?i)(?:주문\s*(?:번호|내역)?|order\s*(?:id|number|no\.?)?|회원\s*(?:번호|id)?|mb\s*id)\s*[:#]?\s*[a-z0-9_-]{3,}"
 )
+_EMAIL = re.compile(r"(?i)[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}")
+_PHONE = re.compile(r"(?<!\d)(?:\+82[-\s]?)?0?1[016789][-\s]?\d{3,4}[-\s]?\d{4}(?!\d)")
 _HIGH_RISK_TERMS = ("이물질", "식중독", "장염", "상해", "응급", "소송", "법적", "경찰")
 _ORDER_TERMS = ("주문", "결제", "배달", "취소", "환불")
 
@@ -67,6 +69,14 @@ def _contains_order_context(text: str, category_path: str) -> bool:
     return bool(_ORDER_OR_ACCOUNT.search(combined)) or any(term in combined for term in _ORDER_TERMS)
 
 
+def _mask_direct_identifiers(text: str) -> str:
+    normalized = text.replace("[EMAIL_REDACTED]", "[REDACTED_EMAIL]").replace(
+        "[PHONE_REDACTED]", "[REDACTED_PHONE]"
+    )
+    masked = _EMAIL.sub("[REDACTED_EMAIL]", normalized)
+    return _PHONE.sub("[REDACTED_PHONE]", masked)
+
+
 def prepare_voc_case(row: Mapping[str, Any], *, source_name: str) -> PreparedVocCase:
     """Prepare one VOC row using an allow-list of non-identity fields only.
 
@@ -79,11 +89,15 @@ def prepare_voc_case(row: Mapping[str, Any], *, source_name: str) -> PreparedVoc
     resolution = _optional(row, "answer")
     category_path = _optional(row, "categoryPath") or "GENERAL"
     source_id = _case_id(source_name, raw_id)
-    safe_title = _clean_text(title)
-    safe_inquiry = _ORDER_OR_ACCOUNT.sub("[REDACTED_ORDER_OR_ACCOUNT]", _clean_text(inquiry))
-    safe_resolution = _ORDER_OR_ACCOUNT.sub(
-        "[REDACTED_ORDER_OR_ACCOUNT]", _clean_text(resolution)
-    ) if resolution else None
+    safe_title = _mask_direct_identifiers(_clean_text(title))
+    safe_inquiry = _mask_direct_identifiers(
+        _ORDER_OR_ACCOUNT.sub("[REDACTED_ORDER_OR_ACCOUNT]", _clean_text(inquiry))
+    )
+    safe_resolution = (
+        _mask_direct_identifiers(_ORDER_OR_ACCOUNT.sub("[REDACTED_ORDER_OR_ACCOUNT]", _clean_text(resolution)))
+        if resolution
+        else None
+    )
 
     if not safe_resolution:
         return PreparedVocCase(

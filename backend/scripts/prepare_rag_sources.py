@@ -40,7 +40,11 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description="Prepare private source files for review; does not embed or index documents."
     )
-    parser.add_argument("--source", required=True, choices=("company-faq", "policy", "guide", "franchise", "voc"))
+    parser.add_argument(
+        "--source",
+        required=True,
+        choices=("company-faq", "policy", "guide", "franchise", "faq-guide", "voc"),
+    )
     parser.add_argument("--input", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path, help="Safe ingestion JSONL output")
     parser.add_argument("--manifest", required=True, type=Path, help="Review and policy metadata JSONL")

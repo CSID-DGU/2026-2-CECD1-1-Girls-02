@@ -87,3 +87,27 @@ def test_policy_and_franchise_sections_are_pending_review_before_drafting():
     assert all(item.review_status == "PENDING_REVIEW" for item in policy_documents)
     assert all(not draft_eligible(item) for item in policy_documents)
     assert all(item.allowed_use == "DRAFT_ONLY" for item in franchise_documents)
+
+
+def test_level_one_content_section_is_not_lost_when_followed_by_level_two_sections():
+    markdown = "# 문서 제목\n\n# 1. 스탬프\n\n스탬프는 결제 후 지급됩니다.\n\n## 2. 등급\n\n등급 혜택 안내"
+
+    documents = prepare_markdown_sections(
+        markdown,
+        source_name="membership",
+        profile=policy_profile("policy", "MEMBERSHIP"),
+    )
+
+    assert [document.title for document in documents] == [
+        "membership - 1. 스탬프",
+        "membership - 2. 등급",
+    ]
+    assert "스탬프는 결제 후 지급됩니다." in documents[0].text
+
+
+def test_user_faq_profile_is_official_faq_and_requires_review():
+    profile = policy_profile("faq-guide", "GENERAL")
+
+    assert profile.doc_type == "FAQ"
+    assert profile.authority_level == "OFFICIAL_FAQ"
+    assert profile.allowed_use == "DRAFT_ONLY"

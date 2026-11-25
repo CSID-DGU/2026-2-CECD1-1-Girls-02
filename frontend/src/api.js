@@ -9,6 +9,18 @@ export class ApiError extends Error {
   }
 }
 
+async function readJson(response) {
+  try {
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The browser sends only the stored inquiry ID. Customer text and personal
+ * data remain inside the backend database boundary.
+ */
 export async function createInquiryAiDraft(inquiryId) {
   const response = await fetch(`${API_BASE_URL}/inquiries/${inquiryId}/ai-draft`, {
     method: "POST",
@@ -26,5 +38,6 @@ export async function createInquiryAiDraft(inquiryId) {
       status: response.status,
     });
   }
+
   return payload.data;
 }
