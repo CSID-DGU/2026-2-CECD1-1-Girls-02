@@ -24,3 +24,45 @@ python -m unittest discover -s rag/tests -v
 ```
 
 The CLI never copies raw input. Retain its artifact directory under access control with ingestion audit, document version, exclusion reason, evaluation run ID, and deployment approval.
+
+## Rebuild the in-process BM25 index after Chroma ingestion
+
+BM25 reads the same deterministic Chroma IDs, documents, and metadata written by
+`ingest_jsonl.py`. Rebuild only after the ingestion command has completed and its
+Chroma ID verification has succeeded. `OfficialSearchSettings.from_env()` uses
+`CHROMA_HOST`, `CHROMA_PORT`, and `CHROMA_OFFICIAL_COLLECTION`; use
+`localhost:8001` on the host or `chroma:8000` inside Compose.
+
+The running application process must own and call the manager. A standalone CLI
+would lose its in-memory index when it exits and cannot update another process.
+
+```python
+from rag.app.retrieval.bm25 import kiwi_tokenize
+from rag.app.retrieval.bm25_chroma import BM25IndexManager, OfficialChromaChunkLoader
+
+loader = OfficialChromaChunkLoader.connect()
+bm25 = BM25IndexManager(loader, tokenizer=kiwi_tokenize)
+status = bm25.rebuild()
+assert status.state == "ready"
+assert status.loaded_chunk_count == status.index_chunk_count
+```
+
+Operational sequence:
+
+1. Confirm Chroma heartbeat and the official collection.
+2. Complete approved FAQ ingestion and ID verification.
+3. Call `rebuild()` inside the process that serves BM25 requests.
+4. Record `status.snapshot_id`, counts, tokenizer, and completion time.
+5. Confirm `state == "ready"` before calling `search()`.
+6. Run a non-sensitive Top-K smoke query.
+
+The loader pages through only active, approved, `DRAFT_ONLY` official chunks and
+validates the same policy again after loading. It preserves Chroma chunk IDs and
+document metadata. A count change during pagination aborts the rebuild. Same-count
+concurrent updates cannot be detected without a Chroma transaction, so ingestion
+and rebuilding must remain sequential.
+
+Rebuilds are fail-closed: the new index is built separately and swapped only after
+validation. During a rebuild, or after a failed rebuild, `search()` raises
+`BM25IndexUnavailableError`; an older index is not silently presented as current.
+Chroma changes do not automatically update BM25—`rebuild()` must be called again.
