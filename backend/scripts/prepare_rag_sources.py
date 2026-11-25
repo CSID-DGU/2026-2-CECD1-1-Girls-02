@@ -47,6 +47,10 @@ def main() -> int:
     parser.add_argument("--rejects", type=Path, help="Optional rejection diagnostics JSONL")
     parser.add_argument("--business-domain", default="GENERAL")
     parser.add_argument("--document-version", default="unspecified")
+    parser.add_argument(
+        "--source-name",
+        help="Optional display name used in document IDs and titles; never use a local filename as public metadata.",
+    )
     args = parser.parse_args()
 
     if args.source == "company-faq":
@@ -65,6 +69,7 @@ def main() -> int:
             source_kind=args.source,
             business_domain=args.business_domain,
             document_version=args.document_version,
+            source_name=args.source_name,
         )
         rejected = []
         output_rows = (document.as_ingestion_row() for document in documents)

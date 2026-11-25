@@ -30,6 +30,24 @@ def test_active_company_faq_is_prepared_but_requires_review_before_drafting():
     assert not draft_eligible(document)
 
 
+def test_company_faq_replaces_masked_070_support_number_with_public_placeholder():
+    documents, _ = prepare_company_faq_rows(
+        [{"id": "faq-phone", "title": "변경 문의", "content": "070-****-1991로 전화", "active": True}]
+    )
+
+    assert "070-0000-0000" in documents[0].text
+    assert "070-****-1991" not in documents[0].text
+
+
+def test_company_faq_removes_brand_alias_from_indexable_text():
+    documents, _ = prepare_company_faq_rows(
+        [{"id": "faq-brand", "title": "pizzaalvolo 안내", "content": "피자알볼로 사이트", "active": True}]
+    )
+
+    assert "alvolo" not in documents[0].text.lower()
+    assert "pizza 안내" in documents[0].text
+
+
 def test_inactive_faq_is_preserved_as_excluded_and_cannot_support_drafts():
     documents, _ = prepare_company_faq_rows(
         [{"id": "faq-2", "title": "종료 FAQ", "content": "종료", "active": False}]

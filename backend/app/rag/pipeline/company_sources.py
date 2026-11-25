@@ -32,6 +32,8 @@ _CATEGORY_CODES = {
     "배달 관련": "DELIVERY",
 }
 _H2 = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
+_SANITIZED_SUPPORT_PHONE = re.compile(r"(?<!\d)070[-\s]?(?:\d{3,4}|\*{3,4})[-\s]?\d{4}(?!\d)")
+_BRAND_ALIAS = re.compile(r"pizzaalvolo|피자알볼로", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -106,11 +108,17 @@ def category_code(category_name: str | None) -> str:
     return _CATEGORY_CODES.get((category_name or "").strip(), "GENERAL")
 
 
+def _sanitize_customer_facing_text(value: str) -> str:
+    """Remove the supplied brand alias and normalize legacy support numbers."""
+    without_brand = _BRAND_ALIAS.sub("pizza", value)
+    return _SANITIZED_SUPPORT_PHONE.sub("070-0000-0000", without_brand)
+
+
 def prepare_company_faq(row: Mapping[str, Any]) -> PreparedDocument:
     """Prepare a row from the company's FAQ export without using attachments."""
     external_id = _required(row, "FAQ id", "id")
-    question = _required(row, "FAQ title", "title")
-    answer = _required(row, "FAQ content", "content")
+    question = _sanitize_customer_facing_text(_required(row, "FAQ title", "title"))
+    answer = _sanitize_customer_facing_text(_required(row, "FAQ content", "content"))
     active = row.get("active")
     if not isinstance(active, bool):
         raise NormalizationError("FAQ active must be a boolean")
@@ -168,7 +176,7 @@ def prepare_markdown_sections(
     text: str, *, source_name: str, profile: SourceProfile, document_version: str = "unspecified"
 ) -> list[PreparedDocument]:
     """Split a vetted Markdown source at H2 headings, retaining heading context."""
-    cleaned_source_name = _clean_text(source_name)
+    cleaned_source_name = _sanitize_customer_facing_text(_clean_text(source_name))
     if not cleaned_source_name:
         raise NormalizationError("missing source name")
     matches = list(_H2.finditer(text))
@@ -177,9 +185,9 @@ def prepare_markdown_sections(
     document_key = sha256(cleaned_source_name.encode("utf-8")).hexdigest()[:12]
     documents: list[PreparedDocument] = []
     for index, match in enumerate(matches):
-        section_title = _clean_text(match.group(1))
+        section_title = _sanitize_customer_facing_text(_clean_text(match.group(1)))
         next_start = matches[index + 1].start() if index + 1 < len(matches) else len(text)
-        section_body = _clean_text(text[match.end() : next_start])
+        section_body = _sanitize_customer_facing_text(_clean_text(text[match.end() : next_start]))
         if not section_body or section_title in {"목차", "히스토리"}:
             continue
         documents.append(
@@ -206,12 +214,12 @@ def prepare_markdown_sections(
 
 def prepare_markdown_file(
     path: Path, *, source_kind: Literal["policy", "guide", "franchise"], business_domain: str,
-    document_version: str = "unspecified",
+    document_version: str = "unspecified", source_name: str | None = None,
 ) -> list[PreparedDocument]:
     """Read an approved Markdown file; its path is never emitted as metadata."""
     return prepare_markdown_sections(
         path.read_text(encoding="utf-8"),
-        source_name=path.stem,
+        source_name=source_name or path.stem,
         profile=policy_profile(source_kind, business_domain),
         document_version=document_version,
     )
