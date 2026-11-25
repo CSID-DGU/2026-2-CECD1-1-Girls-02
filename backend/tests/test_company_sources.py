@@ -45,7 +45,18 @@ def test_company_faq_removes_brand_alias_from_indexable_text():
     )
 
     assert "alvolo" not in documents[0].text.lower()
-    assert "pizza 안내" in documents[0].text
+    assert "pizzaalvolo" not in documents[0].text.lower()
+
+
+def test_company_faq_rebrands_membership_terms_and_versions_documents():
+    documents, _ = prepare_company_faq_rows(
+        [{"id": "faq-member", "title": "비행기 스탬프", "content": "탑승준비 이코노미 비즈니스 퍼스트클래스", "active": True}]
+    )
+
+    document = documents[0]
+    assert "동국피자 스탬프" in document.text
+    assert all(term in document.text for term in ("일반", "SILVER", "GOLD", "VIP"))
+    assert document.document_version.endswith("-dongguk-v1")
 
 
 def test_inactive_faq_is_preserved_as_excluded_and_cannot_support_drafts():

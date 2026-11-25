@@ -22,7 +22,9 @@ def test_voc_uses_allow_list_and_never_emits_identity_or_internal_fields():
 
     row = case.as_quarantine_row()
     assert case.case_status == "READY_FOR_REVIEW"
-    assert row["usage_scope"] == "AGENT_DRAFT_ONLY"
+    assert row["usage_scope"] == "AGENT_REFERENCE_ONLY"
+    assert row["allowed_use"] == "AGENT_REFERENCE_ONLY"
+    assert row["document_version"] == "voc-quarantined-v1"
     assert "홍길동" not in str(row)
     assert "person@example.com" not in str(row)
     assert "internal note" not in str(row)

@@ -44,6 +44,8 @@ class SourceRecord:
     authority_level: str | None = None
     document_type: str | None = None
     business_domain: str | None = None
+    category_path: str | None = None
+    case_status: str | None = None
 
 
 class Embedder(Protocol):
@@ -97,6 +99,8 @@ def parse_record(payload: dict[str, Any], expected_source_type: str) -> SourceRe
         authority_level=payload.get("authority_level"),
         document_type=payload.get("doc_type"),
         business_domain=payload.get("business_domain"),
+        category_path=payload.get("category_path"),
+        case_status=payload.get("case_status"),
     )
 
 
@@ -174,7 +178,7 @@ def make_chunks(record: SourceRecord, collection: str, *, chunk_size: int = 800,
             value = getattr(record, key)
             if isinstance(value, str) and value.strip():
                 metadata[key] = value.strip()
-        for key in ("source_url", "published_at", "category"):
+        for key in ("source_url", "published_at", "category", "category_path", "case_status"):
             value = getattr(record, key)
             if isinstance(value, str) and value.strip():
                 metadata[key] = value.strip()
@@ -190,7 +194,12 @@ def load_jsonl(path: Path, expected_source_type: str) -> tuple[list[SourceRecord
             if not line.strip():
                 continue
             try:
-                records.append(parse_record(json.loads(line), expected_source_type))
+                payload = json.loads(line)
+                # Excluded VOC rows are retained in the private quarantine file
+                # for audit, but are never sent to the indexer.
+                if expected_source_type == "voc" and payload.get("case_status") != "READY_FOR_REVIEW":
+                    continue
+                records.append(parse_record(payload, expected_source_type))
             except (json.JSONDecodeError, IngestionError) as error:
                 rejects.append({"line": line_number, "reason": str(error)})
     return records, rejects
@@ -223,20 +232,32 @@ def write_artifacts(output_dir: Path, chunks: list[Chunk], audit: list[dict[str,
 
 def _assert_indexable(chunks: list[Chunk], collection: str) -> None:
     """Defence in depth: the approved file name is not an authorization boundary."""
-    if collection != OFFICIAL_COLLECTION:
-        raise IngestionError("VOC indexing is disabled in the initial customer-answer baseline")
+    if collection not in ALLOWED_COLLECTIONS:
+        raise IngestionError("unsupported collection")
     for chunk in chunks:
         metadata = chunk.metadata
+        if collection == OFFICIAL_COLLECTION:
+            if (
+                metadata.get("knowledge_scope") != "official"
+                or metadata.get("is_active") is not True
+                or metadata.get("review_status") != "APPROVED"
+                or metadata.get("allowed_use") != OFFICIAL_USAGE
+                or not isinstance(metadata.get("category"), str)
+                or not str(metadata["category"]).strip()
+            ):
+                raise IngestionError(
+                    "only active, approved, categorized DRAFT_ONLY official chunks may be indexed"
+                )
+            continue
+
         if (
-            metadata.get("knowledge_scope") != "official"
-            or metadata.get("is_active") is not True
-            or metadata.get("review_status") != "APPROVED"
-            or metadata.get("allowed_use") != OFFICIAL_USAGE
-            or not isinstance(metadata.get("category"), str)
-            or not str(metadata["category"]).strip()
+            metadata.get("knowledge_scope") != "voc"
+            or metadata.get("usage_scope") != VOC_USAGE
+            or metadata.get("allowed_use") != VOC_USAGE
+            or metadata.get("case_status") != "READY_FOR_REVIEW"
         ):
             raise IngestionError(
-                "only active, approved, categorized DRAFT_ONLY official chunks may be indexed"
+                "only READY_FOR_REVIEW, AGENT_REFERENCE_ONLY VOC chunks may be indexed"
             )
 
 

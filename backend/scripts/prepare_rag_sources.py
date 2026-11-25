@@ -55,6 +55,7 @@ def main() -> int:
         "--source-name",
         help="Optional display name used in document IDs and titles; never use a local filename as public metadata.",
     )
+    parser.add_argument("--source-id-key", help="Stable internal key used to preserve document identity across rebranding.")
     args = parser.parse_args()
 
     if args.source == "company-faq":
@@ -74,6 +75,7 @@ def main() -> int:
             business_domain=args.business_domain,
             document_version=args.document_version,
             source_name=args.source_name,
+            source_id_key=args.source_id_key,
         )
         rejected = []
         output_rows = (document.as_ingestion_row() for document in documents)
