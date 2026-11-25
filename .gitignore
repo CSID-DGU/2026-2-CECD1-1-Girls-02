@@ -30,6 +30,8 @@ data/*.jsonl
 data/rag-build/
 backend/data/raw/
 backend/data/private/
+# Private Markdown review queues generated from official source documents.
+backend/data/private/review-queue.*.md
 backend/artifacts/
 rag/data/
 rag/artifacts/

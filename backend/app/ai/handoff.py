@@ -17,6 +17,16 @@ _INDIVIDUAL_FRANCHISE_TERMS = (
     "제 지역",
     "내 지역",
 )
+_INDIVIDUAL_ORDER_TERMS = (
+    "주문번호",
+    "주문 내역",
+    "주문상태",
+    "주문 상태",
+    "내 주문",
+    "결제 내역",
+    "배달 상태",
+    "배송 상태",
+)
 
 
 def requires_franchise_handoff(inquiry_text: str) -> bool:
@@ -25,3 +35,9 @@ def requires_franchise_handoff(inquiry_text: str) -> bool:
     is_franchise_question = any(term in normalized for term in _FRANCHISE_TERMS)
     needs_individual_judgment = any(term in normalized for term in _INDIVIDUAL_FRANCHISE_TERMS)
     return is_franchise_question and needs_individual_judgment
+
+
+def requires_individual_order_handoff(inquiry_text: str) -> bool:
+    """Keep order-specific requests out of the automatic-answer path."""
+    normalized = inquiry_text.casefold()
+    return any(term in normalized for term in _INDIVIDUAL_ORDER_TERMS)
