@@ -24,7 +24,7 @@ docker compose up -d postgres chroma
 docker compose ps
 ```
 
-PostgreSQL은 `localhost:5432`, Chroma는 `localhost:8001`에서 접근합니다.
+PostgreSQL은 `POSTGRES_PORT` 환경 변수(기본 `5432`)로, Chroma는 `CHROMA_PORT` 환경 변수로 접근합니다. 로컬 포트가 이미 사용 중이면 `.env`에서 `CHROMA_PORT`를 변경하고 Docker Compose와 FastAPI가 같은 값을 사용하도록 설정합니다.
 
 종료할 때는 아래 명령을 사용합니다.
 
