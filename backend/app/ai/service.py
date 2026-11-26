@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.ai.handoff import requires_individual_order_handoff
-from app.ai.models import DraftAction, DraftResult, EvidenceKind
+from app.ai.models import DraftResult, EvidenceKind
 from app.ai.runtime import get_rag_agent_runtime
 from app.core.errors import AppError, ErrorCode
 from app.db.models import (
@@ -77,10 +77,10 @@ class InquiryAiService:
             inquiry = self._session.get(Inquiry, inquiry_id)
             if inquiry is None:
                 raise AppError(ErrorCode.NOT_FOUND, "문의를 찾을 수 없습니다.")
-            if inquiry.status is not InquiryStatus.RECEIVED:
+            if inquiry.status is not InquiryStatus.DRAFT_GENERATING:
                 raise AppError(ErrorCode.CONFLICT, "이미 AI 처리되었거나 처리할 수 없는 문의입니다.")
 
-            # Deliberately exclude customer_name and customer_contact from AI input.
+            # Deliberately exclude customer_name from AI input.
             return f"제목: {inquiry.title}\n내용: {inquiry.content}"
 
     def _persist_result(self, inquiry_id: int, result: DraftResult) -> None:
@@ -89,7 +89,7 @@ class InquiryAiService:
             inquiry = self._session.get(Inquiry, inquiry_id, with_for_update=True)
             if inquiry is None:
                 raise AppError(ErrorCode.NOT_FOUND, "문의를 찾을 수 없습니다.")
-            if inquiry.status is not InquiryStatus.RECEIVED:
+            if inquiry.status is not InquiryStatus.DRAFT_GENERATING:
                 raise AppError(ErrorCode.CONFLICT, "이미 AI 처리된 문의입니다.")
 
             draft = AnswerDraft(
@@ -109,11 +109,7 @@ class InquiryAiService:
             )
             generation.sources = self._sources_from(result)
 
-            inquiry.status = (
-                InquiryStatus.AI_DRAFTED
-                if result.action is DraftAction.DRAFT_FOR_REVIEW
-                else InquiryStatus.ESCALATED
-            )
+            inquiry.status = InquiryStatus.PENDING_REVIEW
             self._session.add_all((draft, generation))
 
     @staticmethod
