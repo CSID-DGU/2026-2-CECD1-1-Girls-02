@@ -9,6 +9,7 @@ from app.api.inquiry_categories import router as inquiry_categories_router
 from app.api.stores import router as stores_router
 from app.api.inquiries import router as inquiries_router
 from app.api.admin_inquiries import router as admin_inquiries_router
+from app.api.admin_metrics import router as admin_metrics_router
 
 from app.core.exception_handlers import register_exception_handlers
 
@@ -40,3 +41,4 @@ app.include_router(inquiry_categories_router)
 app.include_router(stores_router)
 app.include_router(inquiries_router)
 app.include_router(admin_inquiries_router)
+app.include_router(admin_metrics_router)
