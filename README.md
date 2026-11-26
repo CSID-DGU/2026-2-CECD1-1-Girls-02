@@ -36,7 +36,7 @@ docker compose down
 
 ```bash
 cd backend
-pip install -e ".[dev]"
+pip install -e ".[dev]" -e ../rag
 alembic upgrade head        # 테이블 생성·갱신
 python scripts/seed_demo.py # 시연용 기준 데이터 (가상 예시)
 uvicorn app.main:app --reload # http://localhost:8000/docs

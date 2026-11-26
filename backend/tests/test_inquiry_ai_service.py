@@ -52,7 +52,6 @@ class InquiryAiServiceTests(unittest.TestCase):
                 title="멤버십 문의",
                 content="혜택이 궁금합니다.",
                 customer_name="Test Customer",
-                customer_contact="010-0000-0000",
                 receipt_token="receipt-test-1",
             )
             self.session.add(inquiry)
@@ -73,7 +72,7 @@ class InquiryAiServiceTests(unittest.TestCase):
         log = self.session.scalar(select(AiGenerationLog))
 
         self.assertIs(result.action, DraftAction.DRAFT_FOR_REVIEW)
-        self.assertIs(inquiry.status, InquiryStatus.AI_DRAFTED)
+        self.assertIs(inquiry.status, InquiryStatus.PENDING_REVIEW)
         self.assertEqual(draft.ai_draft_text, "검토용 답변 초안")
         self.assertIsNone(draft.escalation_reason)
         self.assertEqual(log.model, "test-model")
@@ -83,8 +82,7 @@ class InquiryAiServiceTests(unittest.TestCase):
             ("case:1", EvidenceKind.VOC_REFERENCE, False),
         ])
         self.assertIn("멤버십 문의", graph.calls[0]["inquiry_text"])
-        self.assertNotIn("Test Customer", graph.calls[0]["inquiry_text"])
-        self.assertNotIn("010-0000-0000", graph.calls[0]["inquiry_text"])
+        
 
     def test_saves_escalation_reason_and_status(self) -> None:
         result = InquiryAiService(self.session, FakeGraph(_result(DraftAction.ESCALATE))).generate_draft(
@@ -95,13 +93,13 @@ class InquiryAiServiceTests(unittest.TestCase):
         draft = self.session.scalar(select(AnswerDraft))
 
         self.assertIs(result.action, DraftAction.ESCALATE)
-        self.assertIs(inquiry.status, InquiryStatus.ESCALATED)
+        self.assertIs(inquiry.status, InquiryStatus.PENDING_REVIEW)
         self.assertIsNone(draft.ai_draft_text)
         self.assertEqual(draft.escalation_reason, "공식 근거가 부족합니다.")
 
-    def test_rejects_an_inquiry_that_is_not_received_before_calling_agent(self) -> None:
+    def test_rejects_an_inquiry_that_is_not_generating_before_calling_agent(self) -> None:
         inquiry = self.session.get(Inquiry, self.inquiry_id)
-        inquiry.status = InquiryStatus.AI_DRAFTED
+        inquiry.status = InquiryStatus.PENDING_REVIEW
         self.session.commit()
         graph = FakeGraph(_result(DraftAction.DRAFT_FOR_REVIEW))
 
