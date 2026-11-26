@@ -15,6 +15,8 @@ class OllamaError(RuntimeError):
 class OllamaGeneration:
     text: str
     latency_ms: int
+    prompt_tokens: int | None = None
+    completion_tokens: int | None = None
 
 
 class OllamaClient:
@@ -31,9 +33,15 @@ class OllamaClient:
         try:
             response = httpx.post(f"{self.base_url}/api/generate", json=payload, timeout=self.timeout_seconds)
             response.raise_for_status()
-            text = response.json().get("response")
+            body = response.json()
+            text = body.get("response")
             if not isinstance(text, str) or not text.strip():
                 raise OllamaError("Ollama response did not contain a non-empty response field")
         except (httpx.HTTPError, ValueError) as exc:
             raise OllamaError("Ollama generation failed") from exc
-        return OllamaGeneration(text=text, latency_ms=round((time.perf_counter() - started) * 1000))
+        return OllamaGeneration(
+            text=text,
+            latency_ms=round((time.perf_counter() - started) * 1000),
+            prompt_tokens=body.get("prompt_eval_count"),
+            completion_tokens=body.get("eval_count"),
+        )

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 
+from app.ai.guardrails import evaluate_input_guardrail, is_korean_internal_note, validate_customer_draft_text
 from app.ai.handoff import requires_franchise_handoff
 from app.ai.models import DraftAction, DraftRequest, DraftResult, GenerationEvent, GenerationStatus
 from app.ai.ollama import OllamaClient, OllamaError
@@ -32,28 +33,31 @@ class DraftOrchestrator:
         try:
             generation = self.client.generate_json(build_prompt(request))
         except OllamaError:
-            return self._escalated("Local model generation failed; agent review is required.", official_ids, voc_ids, GenerationStatus.MODEL_ERROR, 0)
+            return self._escalated("AI 응답 생성에 실패하여 담당자 검토가 필요합니다.", official_ids, voc_ids, GenerationStatus.MODEL_ERROR, 0)
         try:
             output = self._validate_model_output(generation.text, set(official_ids))
         except ValueError:
-            return self._escalated("Model output did not satisfy the review safety contract.", official_ids, voc_ids, GenerationStatus.INVALID_MODEL_OUTPUT, generation.latency_ms)
+            return self._escalated("AI 응답이 안전 형식 검증을 통과하지 않아 담당자 검토가 필요합니다.", official_ids, voc_ids, GenerationStatus.INVALID_MODEL_OUTPUT, generation.latency_ms)
         return DraftResult(output.action, output.draft_text, output.escalation_reason, output.cited_source_ids, self._event(official_ids, voc_ids, generation.latency_ms, GenerationStatus.COMPLETED))
 
     def _required_escalation_reason(self, request: DraftRequest) -> str | None:
+        guardrail = evaluate_input_guardrail(request.inquiry_text)
+        if guardrail.should_handoff:
+            return guardrail.reason
         if request.has_individual_order_context:
-            return "Individual order/account verification is required."
+            return "개별 주문 또는 계정 확인이 필요합니다."
         if requires_franchise_handoff(request.inquiry_text):
-            return "Individual franchise consultation requires specialist review."
+            return "개별 창업 상담은 담당자 검토가 필요합니다."
         if request.is_sensitive:
-            return "Sensitive inquiry requires specialist review."
+            return "민감한 문의는 담당자 검토가 필요합니다."
         if request.is_safety_related or any(term in request.inquiry_text for term in _RISK_TERMS):
-            return "Safety or urgent-risk inquiry requires immediate human handling."
+            return "안전 또는 긴급 위험 관련 문의는 담당자가 즉시 처리해야 합니다."
         if request.is_urgent:
-            return "Urgent inquiry requires human handling."
+            return "긴급 문의는 담당자 확인이 필요합니다."
         if request.retrieval_failed:
-            return "Official knowledge search is unavailable; agent review is required."
+            return "공식 지식 검색을 사용할 수 없어 담당자 검토가 필요합니다."
         if not request.official_evidence:
-            return "No authoritative official evidence is available."
+            return "공식 근거가 부족하여 담당자 검토가 필요합니다."
         return None
 
     def _validate_model_output(self, raw: str, official_ids: set[str]) -> _ValidatedOutput:
@@ -68,7 +72,13 @@ class DraftOrchestrator:
         if action is DraftAction.DRAFT_FOR_REVIEW:
             if not isinstance(draft_text, str) or not draft_text.strip() or not citations or reason is not None:
                 raise ValueError("unsupported draft")
-        elif draft_text is not None or not isinstance(reason, str) or not reason.strip():
+            validate_customer_draft_text(draft_text)
+        elif (
+            draft_text is not None
+            or not isinstance(reason, str)
+            or not reason.strip()
+            or not is_korean_internal_note(reason)
+        ):
             raise ValueError("invalid escalation")
         return _ValidatedOutput(action, draft_text, reason, citations)
 

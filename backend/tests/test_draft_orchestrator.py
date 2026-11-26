@@ -1,7 +1,7 @@
 from app.ai.models import DraftAction, DraftRequest, Evidence, EvidenceKind, GenerationStatus
 from app.ai.ollama import OllamaGeneration
 from app.ai.orchestrator import DraftOrchestrator
-from app.ai.prompting import build_prompt
+from app.ai.prompting import PROMPT_VERSION, build_prompt
 
 
 class FakeOllama:
@@ -24,6 +24,27 @@ def test_order_context_is_escalated_without_model_call() -> None:
     assert result.action is DraftAction.ESCALATE
     assert result.event.status is GenerationStatus.RULE_ESCALATED
     assert not hasattr(client, "prompt")
+
+
+def test_personal_account_question_is_escalated_without_model_call() -> None:
+    client = FakeOllama("not used")
+    result = DraftOrchestrator(client).create_draft(
+        DraftRequest("제 계정 포인트가 어제 사라졌는데 확인해 주세요.", [OFFICIAL])
+    )
+    assert result.action is DraftAction.ESCALATE
+    assert result.event.status is GenerationStatus.RULE_ESCALATED
+    assert result.escalation_reason == "개인 계정의 포인트·쿠폰·결제 내역 확인이 필요합니다."
+    assert not hasattr(client, "prompt")
+
+
+def test_unsafe_customer_draft_falls_back_to_escalation() -> None:
+    client = FakeOllama(
+        '{"action":"DRAFT_FOR_REVIEW","draft_text":"주문번호를 알려주시면 확인해 드리겠습니다.",'
+        '"escalation_reason":null,"cited_source_ids":["policy-1"]}'
+    )
+    result = DraftOrchestrator(client).create_draft(DraftRequest("환불은 어떻게 되나요?", [OFFICIAL]))
+    assert result.action is DraftAction.ESCALATE
+    assert result.event.status is GenerationStatus.INVALID_MODEL_OUTPUT
 
 
 def test_general_franchise_question_can_create_a_draft() -> None:
@@ -61,3 +82,11 @@ def test_prompt_redacts_direct_identifiers() -> None:
     assert "foo@example.com" not in prompt
     assert "010-1234-5678" not in prompt
     assert "ABCD1234" not in prompt
+
+
+def test_prompt_contains_the_customer_rag_v2_safety_contract() -> None:
+    prompt = build_prompt(DraftRequest("포인트 적립 기준이 궁금해요.", [OFFICIAL]))
+    assert PROMPT_VERSION == "customer-rag-v2"
+    assert "source ids only in cited_source_ids" in prompt
+    assert "own account, points, coupons, payment, or order" in prompt
+    assert "If action is ESCALATE: draft_text must be null" in prompt

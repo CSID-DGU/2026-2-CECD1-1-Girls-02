@@ -5,6 +5,7 @@ from collections.abc import Iterable
 from typing import Protocol, TypedDict
 
 from app.ai.context import ContextBuildResult, RetrievedChunk, build_official_context
+from app.ai.guardrails import evaluate_input_guardrail
 from app.ai.handoff import requires_franchise_handoff
 from app.ai.models import DraftRequest, DraftResult
 from app.ai.orchestrator import DraftOrchestrator
@@ -67,7 +68,8 @@ def build_rag_agent_graph(
         return {}
 
     def route_after_classify(state: AgentState) -> str:
-        return "handoff" if _needs_rule_handoff(state) else "retrieve"
+        guardrail = evaluate_input_guardrail(state["inquiry_text"])
+        return "handoff" if guardrail.should_handoff or _needs_rule_handoff(state) else "retrieve"
 
     def retrieve(state: AgentState) -> dict[str, object]:
         try:
