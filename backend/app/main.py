@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.ai_drafts import router as ai_drafts_router
+from app.api.chat import router as chat_router
 from app.api.health import router as health_router
 from app.core.config import get_settings
 from app.api.faqs import router as faqs_router
@@ -42,3 +43,4 @@ app.include_router(stores_router)
 app.include_router(inquiries_router)
 app.include_router(admin_inquiries_router)
 app.include_router(admin_metrics_router)
+app.include_router(chat_router)
