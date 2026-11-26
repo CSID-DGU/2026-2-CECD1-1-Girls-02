@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     ollama_model: str = "llama3.1:8b"
     ollama_timeout_seconds: float = 20.0
     database_url: str | None = None
+    default_brand_code: str = "brand_a"
     cors_origins: str = "http://localhost:5173"
 
     model_config = SettingsConfigDict(
