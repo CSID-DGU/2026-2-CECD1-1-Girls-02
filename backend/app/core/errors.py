@@ -31,6 +31,12 @@ class ErrorCode(Enum):
     INQUIRY_ALREADY_ANSWERED = (409, "이미 답변이 완료된 문의입니다.")
     INVALID_STATUS_TRANSITION = (409, "현재 상태에서 허용하지 않는 처리입니다.")
 
+    # 챗봇
+    CONVERSATION_NOT_FOUND = (404, "대화를 찾을 수 없습니다.")
+    RAG_SEARCH_FAILED = (500, "정책 문서 검색에 실패했습니다.")
+    LLM_UNAVAILABLE = (503, "AI 답변을 생성할 수 없습니다. 잠시 후 다시 시도해 주세요.")
+    LLM_TIMEOUT = (504, "AI 모델 응답 시간이 초과되었습니다.")
+
     # 500
     INTERNAL_SERVER_ERROR = (500, "서버 내부 오류가 발생했습니다.")
 
