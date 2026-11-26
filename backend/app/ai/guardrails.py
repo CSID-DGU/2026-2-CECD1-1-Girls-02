@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import re
+from collections.abc import Iterable
 
 from app.ai.handoff import requires_franchise_handoff, requires_individual_order_handoff
 
@@ -26,6 +27,7 @@ _PROMPT_INJECTION = re.compile(
     re.IGNORECASE,
 )
 _URL_OR_MARKDOWN = re.compile(r"https?://|\]\(", re.IGNORECASE)
+_MARKDOWN_FORMATTING = re.compile(r"(?:^|\n)\s*(?:#{1,6}\s|[-*+]\s)|\*\*|__")
 _SOURCE_IDENTIFIER = re.compile(r"(?:source[_ ]?id|(?:policy|faq|voc)-[a-z0-9_-]+)", re.IGNORECASE)
 _DIRECT_IDENTIFIER_REQUEST = re.compile(
     r"(?:주문\s*번호|연락처|전화\s*번호|계정\s*정보).{0,16}(?:알려|입력|전달|보내|기재)",
@@ -63,9 +65,14 @@ def evaluate_input_guardrail(inquiry_text: str) -> InputGuardrailDecision:
     return InputGuardrailDecision(False)
 
 
-def validate_customer_draft_text(text: str) -> None:
+def validate_customer_draft_text(text: str, *, document_titles: Iterable[str] = ()) -> None:
     """Reject output that leaks model-facing identifiers or asks for identifiers."""
-    if _URL_OR_MARKDOWN.search(text) or _SOURCE_IDENTIFIER.search(text):
+    if (
+        _URL_OR_MARKDOWN.search(text)
+        or _MARKDOWN_FORMATTING.search(text)
+        or _SOURCE_IDENTIFIER.search(text)
+        or any(f"[{title}]" in text for title in document_titles if title.strip())
+    ):
         raise ValueError("customer draft contains a link or internal source identifier")
     if _DIRECT_IDENTIFIER_REQUEST.search(text):
         raise ValueError("customer draft requests a direct identifier")

@@ -28,6 +28,7 @@ def test_customer_draft_rejects_links_source_ids_and_identifier_requests() -> No
     for draft in (
         "자세한 내용은 https://example.test 에서 확인해 주세요.",
         "[policy-point-01] 안내를 참고해 주세요.",
+        "**중요 안내**를 확인해 주세요.",
         "주문번호를 알려주시면 확인해 드리겠습니다.",
     ):
         try:
@@ -35,3 +36,11 @@ def test_customer_draft_rejects_links_source_ids_and_identifier_requests() -> No
         except ValueError:
             continue
         raise AssertionError("unsafe customer draft was accepted")
+
+
+def test_customer_draft_rejects_a_context_document_title_in_brackets() -> None:
+    try:
+        validate_customer_draft_text("[포인트 유효기간 안내]를 참고해 주세요.", document_titles=["포인트 유효기간 안내"])
+    except ValueError:
+        return
+    raise AssertionError("document title reference was accepted")

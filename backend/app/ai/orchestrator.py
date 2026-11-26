@@ -35,7 +35,9 @@ class DraftOrchestrator:
         except OllamaError:
             return self._escalated("AI 응답 생성에 실패하여 담당자 검토가 필요합니다.", official_ids, voc_ids, GenerationStatus.MODEL_ERROR, 0)
         try:
-            output = self._validate_model_output(generation.text, set(official_ids))
+            output = self._validate_model_output(
+                generation.text, set(official_ids), [item.title for item in request.official_evidence]
+            )
         except ValueError:
             return self._escalated("AI 응답이 안전 형식 검증을 통과하지 않아 담당자 검토가 필요합니다.", official_ids, voc_ids, GenerationStatus.INVALID_MODEL_OUTPUT, generation.latency_ms)
         return DraftResult(output.action, output.draft_text, output.escalation_reason, output.cited_source_ids, self._event(official_ids, voc_ids, generation.latency_ms, GenerationStatus.COMPLETED))
@@ -60,7 +62,9 @@ class DraftOrchestrator:
             return "공식 근거가 부족하여 담당자 검토가 필요합니다."
         return None
 
-    def _validate_model_output(self, raw: str, official_ids: set[str]) -> _ValidatedOutput:
+    def _validate_model_output(
+        self, raw: str, official_ids: set[str], document_titles: list[str]
+    ) -> _ValidatedOutput:
         try:
             value = json.loads(raw)
             action = DraftAction(value["action"])
@@ -72,7 +76,7 @@ class DraftOrchestrator:
         if action is DraftAction.DRAFT_FOR_REVIEW:
             if not isinstance(draft_text, str) or not draft_text.strip() or not citations or reason is not None:
                 raise ValueError("unsupported draft")
-            validate_customer_draft_text(draft_text)
+            validate_customer_draft_text(draft_text, document_titles=document_titles)
         elif (
             draft_text is not None
             or not isinstance(reason, str)
