@@ -20,6 +20,7 @@ from app.db.models import (
     Inquiry,
     InquiryStatus,
 )
+from app.ai.privacy import redact_pii
 
 
 class AgentGraph(Protocol):
@@ -80,8 +81,10 @@ class InquiryAiService:
             if inquiry.status is not InquiryStatus.DRAFT_GENERATING:
                 raise AppError(ErrorCode.CONFLICT, "이미 AI 처리되었거나 처리할 수 없는 문의입니다.")
 
-            # Deliberately exclude customer_name from AI input.
-            return f"제목: {inquiry.title}\n내용: {inquiry.content}"
+            # Deliberately exclude customer_name from AI input, and mask direct identifiers.
+            return redact_pii(
+                f"제목: {inquiry.title}\n내용: {inquiry.content}"
+            )           
 
     def _persist_result(self, inquiry_id: int, result: DraftResult) -> None:
         with self._session.begin():
