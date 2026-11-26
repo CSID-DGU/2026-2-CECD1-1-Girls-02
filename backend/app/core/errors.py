@@ -15,6 +15,9 @@ class ErrorCode(Enum):
     METHOD_NOT_ALLOWED = (405, "허용되지 않은 요청 방식입니다.")
     CONFLICT = (409, "현재 상태에서 처리할 수 없는 요청입니다.")
     BRAND_NOT_FOUND = (404, "브랜드를 찾을 수 없습니다.")
+        # FAQ
+    FAQ_CATEGORY_NOT_FOUND = (404, "FAQ 카테고리를 찾을 수 없습니다.")
+    FAQ_NOT_FOUND = (404, "FAQ를 찾을 수 없습니다.")
 
     # 500
     INTERNAL_SERVER_ERROR = (500, "서버 내부 오류가 발생했습니다.")
