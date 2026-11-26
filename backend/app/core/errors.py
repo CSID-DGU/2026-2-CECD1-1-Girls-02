@@ -26,6 +26,11 @@ class ErrorCode(Enum):
     INQUIRY_NOT_FOUND = (404, "문의를 찾을 수 없습니다.")
     INQUIRY_SAVE_FAILED = (500, "문의 저장에 실패했습니다.")
 
+    # 관리자 문의 처리
+    INVALID_STATUS = (400, "허용하지 않는 상태값입니다.")
+    INQUIRY_ALREADY_ANSWERED = (409, "이미 답변이 완료된 문의입니다.")
+    INVALID_STATUS_TRANSITION = (409, "현재 상태에서 허용하지 않는 처리입니다.")
+
     # 500
     INTERNAL_SERVER_ERROR = (500, "서버 내부 오류가 발생했습니다.")
 
