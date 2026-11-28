@@ -5,6 +5,7 @@ from collections.abc import Iterable
 from typing import Protocol, TypedDict
 
 from app.ai.context import ContextBuildResult, RetrievedChunk, build_official_context
+from app.ai.answerability import assess_answerability
 from app.ai.guardrails import evaluate_input_guardrail
 from app.ai.handoff import requires_franchise_handoff
 from app.ai.models import DraftRequest, DraftResult
@@ -25,6 +26,7 @@ class AgentState(TypedDict, total=False):
     is_safety_related: bool
     is_urgent: bool
     retrieval_failed: bool
+    answerability_reason: str | None
     context: ContextBuildResult
     result: DraftResult
 
@@ -77,7 +79,12 @@ def build_rag_agent_graph(
         except OfficialRetrievalUnavailable:
             # A retrieval outage must never fall through to a model-generated answer.
             return {"context": build_official_context([]), "retrieval_failed": True}
-        return {"context": build_official_context(hits, max_chunks=top_k)}
+        assessment = assess_answerability(state["inquiry_text"], hits)
+        context = build_official_context(assessment.eligible_hits, max_chunks=top_k)
+        return {
+            "context": context,
+            "answerability_reason": assessment.reason,
+        }
 
     def route_after_retrieve(state: AgentState) -> str:
         context = state["context"]

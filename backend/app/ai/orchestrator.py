@@ -79,6 +79,7 @@ class DraftOrchestrator:
             validate_customer_draft_text(draft_text, document_titles=document_titles)
         elif (
             draft_text is not None
+            or citations != []
             or not isinstance(reason, str)
             or not reason.strip()
             or not is_korean_internal_note(reason)

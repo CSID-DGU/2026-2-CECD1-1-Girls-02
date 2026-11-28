@@ -8,7 +8,10 @@ from pathlib import Path
 import statistics
 import sys
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+_BACKEND_ROOT = Path(__file__).resolve().parents[1]
+_REPOSITORY_ROOT = _BACKEND_ROOT.parent
+sys.path.insert(0, str(_REPOSITORY_ROOT))
+sys.path.insert(0, str(_BACKEND_ROOT))
 
 from app.ai.evaluation import evaluate_case, parse_case
 from app.ai.ollama import OllamaClient, OllamaError
