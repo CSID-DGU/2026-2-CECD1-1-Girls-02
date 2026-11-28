@@ -5,7 +5,7 @@ import json
 from app.ai.models import DraftRequest, Evidence
 from app.ai.privacy import redact_pii
 
-PROMPT_VERSION = "customer-rag-v2"
+PROMPT_VERSION = "customer-rag-v3"
 
 
 def _evidence_payload(evidence: list[Evidence]) -> list[dict[str, str]]:
@@ -27,7 +27,7 @@ Rules:
 - For a draft, cite every official source used. For escalation, draft_text must be null.
 - Put source ids only in cited_source_ids. draft_text must not contain source ids, document titles in brackets, URLs, links, or Markdown.
 - If action is DRAFT_FOR_REVIEW: draft_text is the reply to the customer, written in polite customer-service Korean (합니다/드립니다체), 2 to 4 sentences; escalation_reason must be null.
-- If action is ESCALATE: draft_text must be null. Do not write any reply to the customer. escalation_reason is a short internal note for the agent, one Korean sentence, saying what the official evidence does not cover.
+- If action is ESCALATE: draft_text must be null and cited_source_ids must be []. Do not write any reply to the customer. escalation_reason is a short internal note for the agent, one Korean sentence, saying what the official evidence does not cover.
 - Do not ask for or reveal personal information, order numbers, or staff contact details.
 
 INPUT CONTEXT:

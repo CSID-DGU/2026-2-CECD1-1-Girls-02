@@ -16,13 +16,16 @@ FLAG_NAMES = (
 
 
 class ObservedOfficialSearch:
-    def __init__(self, settings):
+    def __init__(self, settings=None):
         self.settings = settings
         self.hits = ()
         self.called = False
         self.error = None
 
     def search_official(self, query: str, *, top_k: int):
+        if self.settings is None:
+            return ()
+
         from app.ai.retrieval_adapter import OfficialRetrievalAdapter, OfficialRetrievalUnavailable
 
         try:
@@ -35,10 +38,15 @@ class ObservedOfficialSearch:
         return self.hits
 
 
+class DiagnosticOrchestrator:
+    """Let the graph reach its terminal node without starting draft generation."""
+
+    def create_draft(self, request):
+        return None
+
+
 def run(args: argparse.Namespace) -> int:
-    from app.ai.agent import (
-        classify, retrieve_official_context, route_after_classify, route_after_retrieve,
-    )
+    from app.ai.agent import build_rag_agent_graph
     from app.ai.guardrails import evaluate_input_guardrail
 
     state = {"inquiry_text": args.query}
@@ -51,13 +59,31 @@ def run(args: argparse.Namespace) -> int:
         value = "미설정" if flag not in state else "true (수동 입력)"
         print(f"{flag}: {value}")
 
-    updates = classify(state)
-    state.update(updates)
-    print("\n[CLASSIFY]\n분류 방식: 현재 classify 노드는 빈 딕셔너리를 반환")
-    print("텍스트 기반 자동 분류: 없음 · 분기 단계에서 텍스트 가드레일 적용")
-    print(f"State 변경: {list(updates) if updates else '없음'}")
-    route = route_after_classify(state)
+    search = ObservedOfficialSearch()
+    top_k = 5
+    if args.with_retrieval:
+        from app.core.config import get_settings
+        from rag.app.retrieval.official import OfficialSearchSettings
+
+        settings = get_settings()
+        search.settings = OfficialSearchSettings(
+            host=settings.chroma_host,
+            port=settings.chroma_port,
+            collection=settings.chroma_official_collection,
+            embedding_model=settings.rag_embedding_model,
+        )
+        top_k = settings.rag_top_k
+
+    graph = build_rag_agent_graph(search=search, orchestrator=DiagnosticOrchestrator(), top_k=top_k)
+    steps = {}
+    for update in graph.stream(state, stream_mode="updates"):
+        steps.update(update)
+
+    classification = steps["classify"]
+    route = "retrieve" if "retrieve" in steps else "handoff"
     guardrail = evaluate_input_guardrail(args.query)
+    print("\n[CLASSIFY]")
+    print(f"State 변경: {list(classification) if classification else '없음'}")
     flags = [flag for flag in FLAG_NAMES if state.get(flag)]
     if guardrail.should_handoff:
         reason = f"{guardrail.reason_code} · {guardrail.reason}"
@@ -75,26 +101,18 @@ def run(args: argparse.Namespace) -> int:
         print("검색 실제 호출: NO")
         return 0
 
-    from app.core.config import get_settings
-    from rag.app.retrieval.official import OfficialSearchSettings
-
-    settings = get_settings()
-    search = ObservedOfficialSearch(OfficialSearchSettings(
-        host=settings.chroma_host,
-        port=settings.chroma_port,
-        collection=settings.chroma_official_collection,
-        embedding_model=settings.rag_embedding_model,
-    ))
-    result = retrieve_official_context(state, search=search, top_k=settings.rag_top_k)
+    result = steps["retrieve"]
+    next_route = "generate" if "generate" in steps else "handoff"
     print(f"검색 실제 호출: {'YES' if search.called else 'NO'}")
-    print(f"전략: Dense · 공식 컬렉션: {display_text(settings.chroma_official_collection)}")
-    next_route = route_after_retrieve({**state, **result})
+    print(f"전략: Dense · 공식 컬렉션: {display_text(search.settings.collection)}")
     if result.get("retrieval_failed"):
         print(f"검색 실패 · 그래프의 다음 경로: {next_route}")
         if search.error is not None:
             describe_error(search.error)
         return 1
 
+    if reason := result.get("answerability_reason"):
+        print(f"답변 가능성 평가: {display_text(reason)}")
     for rank, hit in enumerate(search.hits, 1):
         print(f"{rank}위 | {display_text(hit.metadata.get('title') or '(제목 없음)')}")
         print(f"     chunk_id: {display_text(hit.chunk_id)}")

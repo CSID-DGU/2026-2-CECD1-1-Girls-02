@@ -59,7 +59,7 @@ def score_response(case: EvaluationCase, raw: str) -> tuple[bool, list[str], str
                 validate_customer_draft_text(draft)
             except ValueError:
                 failures.append("unsafe_draft_text")
-    elif draft is not None or not isinstance(reason, str) or not reason.strip():
+    elif draft is not None or citations != [] or not isinstance(reason, str) or not reason.strip():
         failures.append("invalid_escalation_contract")
     elif not is_korean_internal_note(reason):
         failures.append("non_korean_escalation_reason")

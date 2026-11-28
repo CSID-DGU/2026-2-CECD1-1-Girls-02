@@ -26,7 +26,6 @@ class DemoAgentRoutingTest(unittest.TestCase):
     def test_questions_follow_existing_rules_without_classification(self):
         for question in (
             "갈릭디핑소스는 몇 개 주나요?",
-            "맛대가리가 존나게 없어요?",
             "피자를 먹고 배가 아파요.",
         ):
             with self.subTest(question=question):
@@ -45,10 +44,16 @@ class DemoAgentRoutingTest(unittest.TestCase):
         self.assertIn("ACCOUNT_VERIFICATION", output)
         self.assertIn("검색 실제 호출: NO", output)
 
+    def test_quality_complaint_bypasses_requested_retrieval_on_main(self):
+        output = self.run_demo("맛대가리가 존나게 없어요?", "--with-retrieval")
+        self.assertIn("선택된 경로: handoff", output)
+        self.assertIn("QUALITY_COMPLAINT", output)
+        self.assertIn("검색 실제 호출: NO", output)
+
     def test_each_manual_flag_bypasses_requested_retrieval(self):
         for option in ("is-sensitive", "is-safety-related", "is-urgent", "has-individual-order-context"):
             with self.subTest(option=option):
-                output = self.run_demo("맛대가리가 존나게 없어요?", "--" + option, "--with-retrieval")
+                output = self.run_demo("갈릭디핑소스는 몇 개 주나요?", "--" + option, "--with-retrieval")
                 self.assertIn(f"{option.replace('-', '_')}: true (수동 입력)", output)
                 self.assertIn("선택된 경로: handoff", output)
                 self.assertIn("검색 실제 호출: NO", output)

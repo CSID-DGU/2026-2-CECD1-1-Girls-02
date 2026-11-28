@@ -1,0 +1,18 @@
+[
+  {"id":"R01","query":"온라인 주문은 언제 가능한가요?","expected_categories":["ORDER"],"expected_source_ids":["faq:62"],"expected_decision":"GENERATE"},
+  {"id":"R02","query":"핫소스를 받지 못했을 때 기본 제공 기준이 궁금해요.","expected_categories":["PRODUCT"],"expected_source_ids":["faq:87"],"expected_decision":"GENERATE"},
+  {"id":"R03","query":"피자 한 판에 쿠폰을 두 장 함께 사용할 수 있나요?","expected_categories":["COUPON"],"expected_source_ids":["faq:96","policy:6aa6a2c10ea9:s007"],"expected_decision":"GENERATE"},
+  {"id":"R04","query":"기간이 지난 쿠폰도 사용할 수 있나요?","expected_categories":["COUPON"],"expected_source_ids":["faq:102"],"expected_decision":"GENERATE"},
+  {"id":"R05","query":"회원가입 쿠폰을 다른 혜택으로 바꿀 수 있나요?","expected_categories":["MEMBERSHIP"],"expected_source_ids":["faq:107"],"expected_decision":"GENERATE"},
+  {"id":"R06","query":"외부 배달 플랫폼 주문에도 멤버십 혜택이 적용되나요?","expected_categories":["MEMBERSHIP"],"expected_source_ids":["faq:122"],"expected_decision":"GENERATE"},
+  {"id":"R07","query":"멤버십 쿠폰은 언제까지 사용할 수 있나요?","expected_categories":["MEMBERSHIP"],"expected_source_ids":["faq:124","policy:6aa6a2c10ea9:s007"],"expected_decision":"GENERATE"},
+  {"id":"R08","query":"스탬프는 주문 금액에 따라 어떻게 쌓이나요?","expected_categories":["MEMBERSHIP"],"expected_source_ids":["policy:6aa6a2c10ea9:s002"],"expected_decision":"GENERATE"},
+  {"id":"R09","query":"배달 주문의 최소 금액이 있나요?","expected_categories":["DELIVERY"],"expected_source_ids":["faq:135"],"expected_decision":"GENERATE"},
+  {"id":"R10","query":"배달비는 어떤 기준으로 정해지나요?","expected_categories":["DELIVERY"],"expected_source_ids":["faq:138"],"expected_decision":"GENERATE"},
+  {"id":"R11","query":"KT 멤버십 할인 조건을 알려주세요.","expected_categories":["MEMBERSHIP","COUPON"],"expected_source_ids":["policy:0d63776ab3be:s004","policy:27458f61f3ed:s002"],"expected_decision":"GENERATE"},
+  {"id":"R12","query":"쿠폰과 통신사 할인은 같이 적용되나요?","expected_categories":["COUPON"],"expected_source_ids":["faq:96","policy:0d63776ab3be:s000","policy:27458f61f3ed:s002"],"expected_decision":"GENERATE"},
+  {"id":"R13","query":"제 포인트가 어제 사라졌는데 확인해 주세요.","expected_categories":[],"expected_source_ids":[],"expected_decision":"HANDOFF"},
+  {"id":"R14","query":"제 주문을 지금 취소 처리해 주세요.","expected_categories":[],"expected_source_ids":[],"expected_decision":"HANDOFF"},
+  {"id":"R15","query":"우리 동네 매장의 배달료를 확인해 주세요.","expected_categories":[],"expected_source_ids":[],"expected_decision":"HANDOFF"},
+  {"id":"R16","query":"창업 계약 비용을 제 상황에 맞춰 안내해 주세요.","expected_categories":[],"expected_source_ids":[],"expected_decision":"HANDOFF"}
+]
