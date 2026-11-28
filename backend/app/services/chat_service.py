@@ -29,6 +29,10 @@ from app.db.models import (
 logger = logging.getLogger(__name__)
 
 HANDOFF_ANSWER = "정확한 확인이 필요한 문의예요. 1:1 문의를 남겨 주시면 담당자가 확인한 뒤 답변드릴게요."
+QUALITY_COMPLAINT_HANDOFF_ANSWER = (
+    "이용에 불편을 드려 죄송합니다. 음식 품질 관련 내용은 주문 및 매장 확인이 필요합니다. "
+    "1:1 문의를 남겨 주시면 담당자가 확인 후 안내드리겠습니다."
+)
 INQUIRY_URL = "/inquiries/new"
 EXCERPT_LENGTH = 200
 
@@ -115,6 +119,13 @@ def handoff_reason_code(question: str, result: DraftResult, evidence: list[ChatE
     return "INSUFFICIENT_EVIDENCE"
 
 
+def handoff_answer(reason: str) -> str:
+    """Use a reviewed customer message for handoffs that do not need an LLM."""
+    if reason == "QUALITY_COMPLAINT":
+        return QUALITY_COMPLAINT_HANDOFF_ANSWER
+    return HANDOFF_ANSWER
+
+
 # ---------- 질문 처리 ----------
 
 def ask(
@@ -153,8 +164,8 @@ def ask(
         raise AppError(ErrorCode.LLM_UNAVAILABLE)
 
     answered = result.action is DraftAction.DRAFT_FOR_REVIEW and bool(result.draft_text)
-    answer = result.draft_text if answered else HANDOFF_ANSWER
     reason = None if answered else handoff_reason_code(message, result, evidence)
+    answer = result.draft_text if answered else handoff_answer(reason)
 
     # 4) 답변 저장
     reply_message = ChatMessage(

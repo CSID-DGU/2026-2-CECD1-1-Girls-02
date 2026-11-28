@@ -9,7 +9,9 @@ def _hit(chunk_id: str, category: str) -> RetrievedChunk:
 
 
 def test_infers_only_explicit_categories():
-    assert infer_query_categories("멤버십 쿠폰 혜택이 궁금해요") == ("MEMBERSHIP", "COUPON")
+    assert infer_query_categories("멤버십 쿠폰 혜택이 궁금해요") == ("MEMBERSHIP",)
+    assert infer_query_categories("배달 주문의 최소 금액이 궁금해요") == ("DELIVERY",)
+    assert infer_query_categories("핫소스 제공 기준이 궁금해요") == ("PRODUCT",)
     assert infer_query_categories("영업시간을 알려주세요") == ()
 
 

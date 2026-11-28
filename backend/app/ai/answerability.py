@@ -34,12 +34,12 @@ class AnswerabilityAssessment:
 # This is deliberately small and explainable.  Unknown wording is not forced
 # into a category; retrieval can still serve an exact general-policy query.
 _CATEGORY_KEYWORDS: tuple[tuple[str, tuple[str, ...]], ...] = (
-    ("MEMBERSHIP", ("멤버십", "등급", "스탬프")),
-    ("COUPON", ("쿠폰", "할인", "프로모션", "제휴")),
-    ("ORDER", ("주문", "결제", "취소", "변경")),
+    ("MEMBERSHIP", ("멤버십", "회원가입", "가입", "회원 등급", "스탬프", "VIP", "GOLD", "SILVER")),
     ("DELIVERY", ("배달", "배송")),
-    ("PRODUCT", ("메뉴", "피자", "토핑", "사이드")),
     ("FRANCHISE", ("창업", "가맹")),
+    ("COUPON", ("쿠폰", "할인", "프로모션", "제휴")),
+    ("PRODUCT", ("메뉴", "피자", "토핑", "사이드", "핫소스", "치즈", "알레르기", "칼로리")),
+    ("ORDER", ("주문", "결제", "취소", "변경")),
 )
 
 
@@ -49,11 +49,13 @@ def infer_query_categories(inquiry_text: str) -> tuple[str, ...]:
     # Hangul (NFD) or zero-width characters.  Normalize before keyword
     # matching so an equivalent customer word never silently bypasses a gate.
     normalized = unicodedata.normalize("NFC", inquiry_text).replace("\u200b", "").casefold()
-    return tuple(
-        category
-        for category, keywords in _CATEGORY_KEYWORDS
-        if any(unicodedata.normalize("NFC", keyword).casefold() in normalized for keyword in keywords)
-    )
+    # The first matching domain is the primary intent.  A delivery-order
+    # question should search DELIVERY, not mix every ORDER document into its
+    # answer context merely because the word "order" is present.
+    for category, keywords in _CATEGORY_KEYWORDS:
+        if any(unicodedata.normalize("NFC", keyword).casefold() in normalized for keyword in keywords):
+            return (category,)
+    return ()
 
 
 def assess_answerability(

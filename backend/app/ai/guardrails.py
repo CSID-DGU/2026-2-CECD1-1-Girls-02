@@ -26,6 +26,17 @@ _PROMPT_INJECTION = re.compile(
     r"(?:DRAFT_FOR_REVIEW|ESCALATE).{0,20}(?:로\s*답|를\s*출력)",
     re.IGNORECASE,
 )
+_AMBIGUOUS_COUPON_COMBINATION = re.compile(
+    r"한\s*주문.{0,24}(?:쿠폰|할인).{0,24}(?:두\s*장|2\s*장|중복)|"
+    r"(?:쿠폰|할인).{0,24}한\s*주문.{0,24}(?:두\s*장|2\s*장|중복)"
+)
+_QUALITY_COMPLAINT = re.compile(
+    r"맛\s*대가리|맛\s*(?:이\s*)?(?:없|이상|변)|맛없|"
+    r"(?:너무\s*)?(?:짜|싱거|달|매워|쓰다)|"
+    r"식었|눅눅|탔|탄\s*맛|상했|쉬었|쉰\s*맛|"
+    r"이물질|머리카락|벌레|곰팡이|악취|이상한?\s*냄새|냄새\s*(?:가\s*)?이상|위생",
+    re.IGNORECASE,
+)
 _URL_OR_MARKDOWN = re.compile(r"https?://|\]\(", re.IGNORECASE)
 _MARKDOWN_FORMATTING = re.compile(r"(?:^|\n)\s*(?:#{1,6}\s|[-*+]\s)|\*\*|__")
 _SOURCE_IDENTIFIER = re.compile(r"(?:source[_ ]?id|(?:policy|faq|voc)-[a-z0-9_-]+)", re.IGNORECASE)
@@ -52,10 +63,27 @@ def requires_account_verification_handoff(inquiry_text: str) -> bool:
     )
 
 
+def requires_quality_complaint_handoff(inquiry_text: str) -> bool:
+    """Route food-quality complaints to a human without unrelated RAG results."""
+    return bool(_QUALITY_COMPLAINT.search(inquiry_text))
+
+
 def evaluate_input_guardrail(inquiry_text: str) -> InputGuardrailDecision:
     """Return a deterministic pre-retrieval decision for one customer inquiry."""
     if _PROMPT_INJECTION.search(inquiry_text):
         return InputGuardrailDecision(True, "PROMPT_INJECTION", "요청 형식 검증이 필요해 담당자 검토로 전환합니다.")
+    if _AMBIGUOUS_COUPON_COMBINATION.search(inquiry_text):
+        return InputGuardrailDecision(
+            True,
+            "AMBIGUOUS_COUPON_POLICY",
+            "쿠폰 종류와 적용 상품에 따라 기준이 달라 담당자 확인이 필요합니다.",
+        )
+    if requires_quality_complaint_handoff(inquiry_text):
+        return InputGuardrailDecision(
+            True,
+            "QUALITY_COMPLAINT",
+            "음식 품질 관련 내용은 주문 및 매장 확인이 필요합니다.",
+        )
     if requires_account_verification_handoff(inquiry_text):
         return InputGuardrailDecision(True, "ACCOUNT_VERIFICATION", "개인 계정의 포인트·쿠폰·결제 내역 확인이 필요합니다.")
     if requires_individual_order_handoff(inquiry_text):
