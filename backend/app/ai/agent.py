@@ -51,6 +51,31 @@ def _request_from_state(state: AgentState, context: ContextBuildResult | None = 
     )
 
 
+def classify(_: AgentState) -> dict[str, object]:
+    return {}
+
+
+def route_after_classify(state: AgentState) -> str:
+    guardrail = evaluate_input_guardrail(state["inquiry_text"])
+    return "handoff" if guardrail.should_handoff or _needs_rule_handoff(state) else "retrieve"
+
+
+def retrieve_official_context(
+    state: AgentState, *, search: OfficialKnowledgeSearch, top_k: int
+) -> dict[str, object]:
+    try:
+        hits = search.search_official(state["inquiry_text"], top_k=top_k)
+    except OfficialRetrievalUnavailable:
+        # A retrieval outage must never fall through to a model-generated answer.
+        return {"context": build_official_context([]), "retrieval_failed": True}
+    return {"context": build_official_context(hits, max_chunks=top_k)}
+
+
+def route_after_retrieve(state: AgentState) -> str:
+    context = state["context"]
+    return "generate" if context.official_evidence else "handoff"
+
+
 def build_rag_agent_graph(
     *, search: OfficialKnowledgeSearch, orchestrator: DraftOrchestrator, top_k: int = 5
 ):
@@ -64,24 +89,8 @@ def build_rag_agent_graph(
     except ImportError as error:  # pragma: no cover - dependency boundary
         raise RuntimeError("Install the agent extras to use the LangGraph orchestrator") from error
 
-    def classify(_: AgentState) -> dict[str, object]:
-        return {}
-
-    def route_after_classify(state: AgentState) -> str:
-        guardrail = evaluate_input_guardrail(state["inquiry_text"])
-        return "handoff" if guardrail.should_handoff or _needs_rule_handoff(state) else "retrieve"
-
     def retrieve(state: AgentState) -> dict[str, object]:
-        try:
-            hits = search.search_official(state["inquiry_text"], top_k=top_k)
-        except OfficialRetrievalUnavailable:
-            # A retrieval outage must never fall through to a model-generated answer.
-            return {"context": build_official_context([]), "retrieval_failed": True}
-        return {"context": build_official_context(hits, max_chunks=top_k)}
-
-    def route_after_retrieve(state: AgentState) -> str:
-        context = state["context"]
-        return "generate" if context.official_evidence else "handoff"
+        return retrieve_official_context(state, search=search, top_k=top_k)
 
     def generate(state: AgentState) -> dict[str, DraftResult]:
         return {"result": orchestrator.create_draft(_request_from_state(state, state["context"]))}
