@@ -22,3 +22,12 @@ def test_evaluator_rejects_english_escalation_reason() -> None:
     passed, failures, _ = score_response(_case("ESCALATE"), '{"action":"ESCALATE","draft_text":null,"escalation_reason":"Account verification is required.","cited_source_ids":[]}')
     assert not passed
     assert failures == ["non_korean_escalation_reason"]
+
+
+def test_evaluator_requires_empty_citations_for_escalation() -> None:
+    passed, failures, _ = score_response(
+        _case("ESCALATE"),
+        '{"action":"ESCALATE","draft_text":null,"escalation_reason":"공식 근거가 부족합니다.","cited_source_ids":["policy-1"]}',
+    )
+    assert not passed
+    assert failures == ["invalid_escalation_contract"]

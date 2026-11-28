@@ -51,6 +51,7 @@ def _official_hit() -> RetrievedChunk:
             "is_active": True,
             "review_status": "APPROVED",
             "allowed_use": "DRAFT_ONLY",
+            "category": "MEMBERSHIP",
         },
     )
 
@@ -108,6 +109,43 @@ class AgentGraphTests(unittest.TestCase):
         self.assertIs(result["result"].event.status, GenerationStatus.RULE_ESCALATED)
         self.assertEqual(result["context"].official_evidence, [])
         self.assertEqual(client.calls, 0)
+
+    def test_category_mismatched_official_hit_escalates_without_calling_model(self):
+        unrelated = RetrievedChunk(
+            "product-1",
+            "핫소스와 파마산 치즈 제공 기준입니다.",
+            0.95,
+            {**_official_hit().metadata, "source_id": "faq:product-1", "category": "PRODUCT"},
+        )
+        search = FakeSearch([unrelated])
+        client = FakeOllama("not used")
+
+        result = self._graph(search, client).invoke({"inquiry_text": "멤버십 혜택이 궁금해요."})
+
+        self.assertIs(result["result"].action, DraftAction.ESCALATE)
+        self.assertIs(result["result"].event.status, GenerationStatus.RULE_ESCALATED)
+        self.assertEqual(result["context"].official_evidence, [])
+        self.assertEqual(client.calls, 0)
+
+    def test_category_gate_keeps_matching_evidence_and_removes_unrelated_official_hit(self):
+        matching = _official_hit()
+        unrelated = RetrievedChunk(
+            "product-1",
+            "핫소스와 파마산 치즈 제공 기준입니다.",
+            0.95,
+            {**matching.metadata, "source_id": "faq:product-1", "category": "PRODUCT"},
+        )
+        search = FakeSearch([unrelated, matching])
+        client = FakeOllama(
+            '{"action":"DRAFT_FOR_REVIEW","draft_text":"멤버십 혜택을 안내드립니다.",'
+            '"escalation_reason":null,"cited_source_ids":["faq:membership-1"]}'
+        )
+
+        result = self._graph(search, client).invoke({"inquiry_text": "멤버십 혜택이 궁금해요."})
+
+        self.assertIs(result["result"].action, DraftAction.DRAFT_FOR_REVIEW)
+        self.assertEqual(result["context"].selected_chunk_ids, ["membership-1"])
+        self.assertEqual(client.calls, 1)
 
     def test_invalid_model_output_falls_back_to_escalation(self):
         search = FakeSearch([_official_hit()])
