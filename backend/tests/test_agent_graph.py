@@ -97,6 +97,20 @@ class AgentGraphTests(unittest.TestCase):
         self.assertEqual(search.calls, 0)
         self.assertEqual(client.calls, 0)
 
+    def test_quality_complaint_bypasses_search_and_model_then_escalates(self):
+        search = FakeSearch([_official_hit()])
+        client = FakeOllama("not used")
+
+        result = self._graph(search, client).invoke(
+            {"inquiry_text": "맛대가리가 너무 없어요."}
+        )
+
+        self.assertIs(result["result"].action, DraftAction.ESCALATE)
+        self.assertIs(result["result"].event.status, GenerationStatus.RULE_ESCALATED)
+        self.assertIn("음식 품질", result["result"].escalation_reason)
+        self.assertEqual(search.calls, 0)
+        self.assertEqual(client.calls, 0)
+
     def test_voc_or_pending_hits_cannot_become_llm_context(self):
         official = _official_hit()
         voc = RetrievedChunk(official.chunk_id, official.text, official.score, {**official.metadata, "knowledge_scope": "voc"})
